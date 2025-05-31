@@ -33,20 +33,28 @@ app.use((req, res, next) => {
     next();
 });
 
-// Rate limiting with proper trust proxy
+// Rate limiting configured for Replit environment
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // increased limit for development
+    max: 100, // increased limit for development
     message: {
         error: 'Too many requests from this IP, please try again later.',
         retryAfter: Math.ceil(15 * 60 * 1000 / 1000)
     },
     standardHeaders: true,
     legacyHeaders: false,
-    trustProxy: true,
+    // Configure for Replit proxy setup
+    trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
     skip: (req) => {
-        // Skip rate limiting for health checks and static files
-        return req.path === '/health' || req.path.startsWith('/api/videos/');
+        // Skip rate limiting for health checks, static files, and validation
+        return req.path === '/health' || 
+               req.path.startsWith('/api/videos/') || 
+               req.path.startsWith('/api/validate') ||
+               req.method === 'OPTIONS';
+    },
+    // Custom key generator that works better with Replit
+    keyGenerator: (req) => {
+        return req.ip || req.connection.remoteAddress || 'anonymous';
     }
 });
 
@@ -96,46 +104,83 @@ function cleanupOldFiles() {
 // Run cleanup every 30 minutes
 setInterval(cleanupOldFiles, 30 * 60 * 1000);
 
-// Enhanced YouTube URL validation
+// Enhanced YouTube URL validation with comprehensive pattern matching
 function isValidYouTubeUrl(url) {
     try {
         if (!url || typeof url !== 'string') return false;
         
-        // Clean the URL
-        url = url.trim();
+        // Clean and normalize the URL
+        url = url.trim().replace(/\s+/g, '');
         
-        // Check basic YouTube URL patterns
-        const patterns = [
-            /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)/,
-            /^https?:\/\/(www\.)?youtube\.com\/embed\//,
-            /^https?:\/\/(www\.)?youtube\.com\/v\//
-        ];
+        // Extract video ID first
+        const videoId = extractVideoId(url);
+        if (!videoId) return false;
         
-        const matchesPattern = patterns.some(pattern => pattern.test(url));
-        if (!matchesPattern) return false;
+        // Validate video ID format
+        if (videoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(videoId)) {
+            return false;
+        }
         
-        // Use ytdl validation as secondary check
-        return ytdl.validateURL(url);
+        // Additional ytdl validation if available
+        try {
+            const testUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            return ytdl.validateURL(testUrl);
+        } catch (ytdlError) {
+            console.warn('ytdl validation failed, using pattern matching only:', ytdlError.message);
+            return true; // Fall back to pattern matching result
+        }
     } catch (error) {
         console.error('URL validation error:', error.message);
         return false;
     }
 }
 
-// Extract video ID with better error handling
+// Enhanced video ID extraction with more patterns
 function extractVideoId(url) {
     try {
+        if (!url || typeof url !== 'string') return null;
+        
+        // Clean the URL
+        url = url.trim().replace(/\s+/g, '');
+        
+        // If it's already just an ID
+        if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+            return url;
+        }
+        
+        // Comprehensive YouTube URL patterns
         const patterns = [
-            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^#&?]*)/,
-            /^([a-zA-Z0-9_-]{11})$/
+            // Standard watch URLs
+            /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+            // Short URLs
+            /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+            // Embed URLs
+            /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+            // Old format
+            /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+            // Mobile URLs
+            /(?:m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+            // Gaming URLs
+            /(?:gaming\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+            // Music URLs
+            /(?:music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+            // With additional parameters
+            /[?&]v=([a-zA-Z0-9_-]{11})/,
+            // YouTube Shorts
+            /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
         ];
 
         for (const pattern of patterns) {
             const match = url.match(pattern);
             if (match && match[1] && match[1].length === 11) {
-                return match[1];
+                // Validate the extracted ID
+                if (/^[a-zA-Z0-9_-]{11}$/.test(match[1])) {
+                    return match[1];
+                }
             }
         }
+        
+        console.warn('No valid video ID found in URL:', url);
         return null;
     } catch (error) {
         console.error('Video ID extraction error:', error.message);
@@ -143,69 +188,101 @@ function extractVideoId(url) {
     }
 }
 
-// Enhanced video info retrieval
+// Enhanced video info retrieval with timeout handling
 async function getVideoInfo(videoId) {
-    try {
-        const url = `https://www.youtube.com/watch?v=${videoId}`;
-        
-        // Add timeout for the request
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-        
-        const info = await ytdl.getInfo(url);
-        clearTimeout(timeout);
-        
-        if (!info || !info.videoDetails) {
-            throw new Error('Invalid video information received');
+    return new Promise(async (resolve, reject) => {
+        // Create manual timeout since AbortController might not be available
+        const timeout = setTimeout(() => {
+            reject(new Error('Request timeout - video may be too long or unavailable'));
+        }, 30000);
+
+        try {
+            const url = `https://www.youtube.com/watch?v=${videoId}`;
+            console.log('Getting video info for:', videoId);
+            
+            // Validate the video ID format first
+            if (!videoId || videoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(videoId)) {
+                throw new Error('Invalid video ID format');
+            }
+            
+            const info = await ytdl.getInfo(url, {
+                requestOptions: {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9'
+                    }
+                }
+            });
+            
+            clearTimeout(timeout);
+            
+            if (!info || !info.videoDetails) {
+                throw new Error('Invalid video information received');
+            }
+            
+            const duration = parseInt(info.videoDetails.lengthSeconds) || 0;
+            
+            // Check duration limits
+            if (duration > 1800) { // 30 minutes
+                throw new Error('Video is too long. Maximum duration is 30 minutes.');
+            }
+            
+            if (duration < 10) { // Minimum 10 seconds
+                throw new Error('Video is too short. Minimum duration is 10 seconds.');
+            }
+            
+            const result = {
+                title: info.videoDetails.title || 'Unknown Title',
+                duration: duration,
+                description: info.videoDetails.description || '',
+                thumbnails: info.videoDetails.thumbnails || [],
+                viewCount: info.videoDetails.viewCount || '0',
+                author: info.videoDetails.author?.name || 'Unknown Author'
+            };
+            
+            console.log('Video info retrieved successfully:', result.title);
+            resolve(result);
+            
+        } catch (error) {
+            clearTimeout(timeout);
+            console.error('Video info error:', error);
+            
+            if (error.message.includes('Video unavailable') || error.message.includes('This video is unavailable')) {
+                reject(new Error('Video is unavailable, private, or deleted'));
+            } else if (error.message.includes('Sign in to confirm your age')) {
+                reject(new Error('Age-restricted video - cannot access'));
+            } else if (error.message.includes('too long') || error.message.includes('too short')) {
+                reject(error);
+            } else if (error.message.includes('timeout')) {
+                reject(new Error('Request timeout - video may be too long or unavailable'));
+            } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                reject(new Error('Network error - please check your connection'));
+            } else {
+                reject(new Error('Failed to get video information. Please check the URL and try again.'));
+            }
         }
-        
-        const duration = parseInt(info.videoDetails.lengthSeconds) || 0;
-        
-        // Check duration limits
-        if (duration > 1800) { // 30 minutes
-            throw new Error('Video is too long. Maximum duration is 30 minutes.');
-        }
-        
-        if (duration < 10) { // Minimum 10 seconds
-            throw new Error('Video is too short. Minimum duration is 10 seconds.');
-        }
-        
-        return {
-            title: info.videoDetails.title || 'Unknown Title',
-            duration: duration,
-            description: info.videoDetails.description || '',
-            thumbnails: info.videoDetails.thumbnails || [],
-            viewCount: info.videoDetails.viewCount || '0',
-            author: info.videoDetails.author?.name || 'Unknown Author'
-        };
-    } catch (error) {
-        if (error.message.includes('Video unavailable')) {
-            throw new Error('Video is unavailable, private, or deleted');
-        } else if (error.message.includes('too long') || error.message.includes('too short')) {
-            throw error;
-        } else {
-            console.error('Video info error:', error.message);
-            throw new Error('Failed to get video information. Please check the URL and try again.');
-        }
-    }
+    });
 }
 
-// Enhanced video download with better error handling
+// Enhanced video download with robust error handling and retry logic
 async function downloadVideo(videoId) {
     return new Promise((resolve, reject) => {
         const url = `https://www.youtube.com/watch?v=${videoId}`;
         const outputPath = path.join(tempDir, `${videoId}_original.mp4`);
         
+        console.log('Starting download process for video:', videoId);
+        
         // Check if file already exists and is valid
         if (fs.existsSync(outputPath)) {
             const stats = fs.statSync(outputPath);
-            if (stats.size > 10000) { // At least 10KB for a valid video
+            if (stats.size > 50000) { // At least 50KB for a valid video
                 console.log('Using cached video:', outputPath);
                 return resolve(outputPath);
             } else {
                 // Remove invalid file
                 try {
                     fs.unlinkSync(outputPath);
+                    console.log('Removed invalid cached file');
                 } catch (e) {
                     console.warn('Could not remove invalid cached file:', e.message);
                 }
@@ -218,34 +295,82 @@ async function downloadVideo(videoId) {
         let totalSize = 0;
 
         try {
-            console.log('Starting download for video:', videoId);
-            
-            // Set download timeout (3 minutes for better user experience)
+            // Set download timeout (2 minutes for better reliability)
             downloadTimeout = setTimeout(() => {
-                if (stream) stream.destroy();
-                if (writeStream) writeStream.destroy();
+                console.log('Download timeout reached');
+                if (stream) {
+                    try { stream.destroy(); } catch (e) { console.warn('Stream destroy error:', e.message); }
+                }
+                if (writeStream) {
+                    try { writeStream.destroy(); } catch (e) { console.warn('WriteStream destroy error:', e.message); }
+                }
                 cleanupFile(outputPath);
-                reject(new Error('Download timeout - please try a shorter video'));
-            }, 3 * 60 * 1000);
+                reject(new Error('Download timeout - video may be too large or connection is slow'));
+            }, 2 * 60 * 1000);
 
-            // Get video info first to check format availability
-            ytdl.getInfo(url).then(info => {
-                // Find the best format with both video and audio
-                const formats = ytdl.filterFormats(info.formats, 'videoandaudio');
+            // Enhanced ytdl options for better compatibility
+            const ytdlOptions = {
+                quality: 'highest',
+                filter: (format) => {
+                    return format.hasVideo && format.hasAudio && 
+                           format.container === 'mp4' &&
+                           format.contentLength;
+                },
+                requestOptions: {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': '*/*',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'identity',
+                        'Connection': 'keep-alive'
+                    },
+                    timeout: 30000
+                }
+            };
+
+            // First, get video info to validate and choose format
+            ytdl.getInfo(url, {
+                requestOptions: ytdlOptions.requestOptions
+            }).then(info => {
+                console.log('Video info retrieved for download:', info.videoDetails.title);
+                
+                // Filter for the best available format
+                let formats = ytdl.filterFormats(info.formats, 'videoandaudio');
+                
                 if (formats.length === 0) {
-                    clearTimeout(downloadTimeout);
-                    reject(new Error('No suitable video format found'));
-                    return;
+                    // Fallback to separate video and audio streams
+                    const videoFormats = ytdl.filterFormats(info.formats, 'videoonly');
+                    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
+                    
+                    if (videoFormats.length === 0 || audioFormats.length === 0) {
+                        clearTimeout(downloadTimeout);
+                        reject(new Error('No suitable video format found - video may be live or unavailable'));
+                        return;
+                    }
+                    
+                    // Use the first available videoandaudio format or fallback
+                    formats = info.formats.filter(format => 
+                        format.hasVideo && format.hasAudio && format.container === 'mp4'
+                    );
+                    
+                    if (formats.length === 0) {
+                        clearTimeout(downloadTimeout);
+                        reject(new Error('No compatible MP4 format available'));
+                        return;
+                    }
                 }
 
-                stream = ytdl(url, { 
-                    quality: 'highestvideo',
-                    filter: 'videoandaudio',
-                    requestOptions: {
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                        }
-                    }
+                // Choose format with reasonable quality and size
+                let selectedFormat = formats.find(f => f.qualityLabel === '720p') || 
+                                   formats.find(f => f.qualityLabel === '480p') || 
+                                   formats[0];
+
+                console.log(`Selected format: ${selectedFormat.qualityLabel || selectedFormat.quality} - ${selectedFormat.container}`);
+
+                // Create download stream
+                stream = ytdl(url, {
+                    quality: selectedFormat.itag,
+                    requestOptions: ytdlOptions.requestOptions
                 });
 
                 writeStream = fs.createWriteStream(outputPath);
@@ -253,7 +378,7 @@ async function downloadVideo(videoId) {
                 stream.pipe(writeStream);
                 
                 stream.on('response', (res) => {
-                    totalSize = parseInt(res.headers['content-length']) || 0;
+                    totalSize = parseInt(res.headers['content-length']) || selectedFormat.contentLength || 0;
                     console.log(`Download started, expected size: ${Math.round(totalSize / 1024 / 1024)}MB`);
                 });
                 
@@ -262,27 +387,38 @@ async function downloadVideo(videoId) {
                     console.error('Download stream error:', error);
                     cleanupFile(outputPath);
                     
-                    if (error.message.includes('Video unavailable') || error.message.includes('private')) {
-                        reject(new Error('Video is unavailable, private, or age-restricted'));
-                    } else if (error.message.includes('Sign in to confirm')) {
+                    if (error.message.includes('Video unavailable') || error.message.includes('This video is unavailable')) {
+                        reject(new Error('Video is unavailable, private, or deleted'));
+                    } else if (error.message.includes('Sign in to confirm') || error.message.includes('age')) {
                         reject(new Error('Age-restricted video - cannot download'));
+                    } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
+                        reject(new Error('Access denied - video may be region-locked or private'));
+                    } else if (error.message.includes('404') || error.message.includes('Not Found')) {
+                        reject(new Error('Video not found - it may have been deleted'));
+                    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+                        reject(new Error('Network error - please check your connection'));
                     } else {
-                        reject(new Error('Failed to download video. Please try a different video.'));
+                        reject(new Error('Failed to download video: ' + error.message));
                     }
                 });
                 
                 writeStream.on('finish', () => {
                     clearTimeout(downloadTimeout);
-                    console.log('Download completed:', outputPath);
+                    console.log('Download write completed:', outputPath);
                     
                     // Verify file size
-                    const stats = fs.statSync(outputPath);
-                    if (stats.size < 10000) { // Less than 10KB indicates a problem
-                        cleanupFile(outputPath);
-                        reject(new Error('Downloaded file is too small or corrupted'));
-                    } else {
-                        console.log(`Successfully downloaded: ${Math.round(stats.size / 1024 / 1024)}MB`);
-                        resolve(outputPath);
+                    try {
+                        const stats = fs.statSync(outputPath);
+                        if (stats.size < 50000) { // Less than 50KB indicates a problem
+                            cleanupFile(outputPath);
+                            reject(new Error('Downloaded file is too small - may be corrupted or incomplete'));
+                        } else {
+                            console.log(`Successfully downloaded: ${Math.round(stats.size / 1024 / 1024)}MB`);
+                            resolve(outputPath);
+                        }
+                    } catch (statError) {
+                        console.error('Error checking file stats:', statError);
+                        reject(new Error('Failed to verify downloaded file'));
                     }
                 });
                 
@@ -290,31 +426,42 @@ async function downloadVideo(videoId) {
                     clearTimeout(downloadTimeout);
                     console.error('Write stream error:', error);
                     cleanupFile(outputPath);
-                    reject(new Error('Failed to save video file'));
+                    reject(new Error('Failed to save video file: ' + error.message));
                 });
                 
                 // Track download progress
                 let downloadedSize = 0;
+                let lastLoggedProgress = 0;
+                
                 stream.on('data', (chunk) => {
                     downloadedSize += chunk.length;
                     if (totalSize > 0) {
                         const progress = Math.round((downloadedSize / totalSize) * 100);
-                        if (progress % 10 === 0) {
+                        // Log progress every 20% to avoid spam
+                        if (progress >= lastLoggedProgress + 20) {
                             console.log(`Download progress: ${progress}%`);
+                            lastLoggedProgress = progress;
                         }
                     }
                 });
                 
             }).catch(error => {
                 clearTimeout(downloadTimeout);
-                console.error('Video info error:', error);
-                reject(new Error('Failed to get video information'));
+                console.error('Video info retrieval error:', error);
+                
+                if (error.message.includes('Video unavailable')) {
+                    reject(new Error('Video is unavailable, private, or deleted'));
+                } else if (error.message.includes('Sign in')) {
+                    reject(new Error('Age-restricted video - cannot access'));
+                } else {
+                    reject(new Error('Failed to get video information for download'));
+                }
             });
             
         } catch (error) {
             clearTimeout(downloadTimeout);
             console.error('Download setup error:', error);
-            reject(new Error('Failed to initialize video download'));
+            reject(new Error('Failed to initialize video download: ' + error.message));
         }
     });
 }
@@ -756,8 +903,8 @@ app.get('/api/info/:videoId', async (req, res) => {
     }
 });
 
-// Add endpoint to validate YouTube URL
-app.post('/api/validate', (req, res) => {
+// Enhanced endpoint to validate YouTube URL
+app.post('/api/validate', async (req, res) => {
     try {
         const { url } = req.body;
         
@@ -767,20 +914,63 @@ app.post('/api/validate', (req, res) => {
                 error: 'URL is required'
             });
         }
+
+        console.log('Validating URL:', url);
         
         const videoId = extractVideoId(url);
+        
+        if (!videoId) {
+            return res.json({
+                success: true,
+                isValid: false,
+                videoId: null,
+                error: 'Invalid YouTube URL format'
+            });
+        }
+
         const isValid = isValidYouTubeUrl(url);
+        
+        // Additional validation - try to get basic video info
+        let canAccess = false;
+        let accessError = null;
+        
+        if (isValid && videoId) {
+            try {
+                // Quick check if video is accessible
+                const testUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                await ytdl.getBasicInfo(testUrl, {
+                    requestOptions: {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        }
+                    }
+                });
+                canAccess = true;
+            } catch (testError) {
+                console.warn('Video access test failed:', testError.message);
+                if (testError.message.includes('Video unavailable')) {
+                    accessError = 'Video is unavailable, private, or deleted';
+                } else if (testError.message.includes('Sign in')) {
+                    accessError = 'Age-restricted video - cannot process';
+                } else {
+                    accessError = 'Video may not be accessible';
+                }
+            }
+        }
         
         res.json({
             success: true,
-            isValid,
-            videoId: isValid ? videoId : null
+            isValid: isValid && canAccess,
+            videoId: isValid ? videoId : null,
+            canAccess,
+            warning: accessError
         });
         
     } catch (error) {
+        console.error('Validation error:', error);
         res.status(500).json({
             success: false,
-            error: 'Validation failed'
+            error: 'Validation failed: ' + error.message
         });
     }
 });

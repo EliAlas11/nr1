@@ -779,7 +779,7 @@
             }
         }
 
-        // Main video processing function
+        // Main video processing function with enhanced validation
         async function processVideo() {
             const url = document.getElementById('youtubeUrl').value.trim();
 
@@ -788,8 +788,19 @@
                 return;
             }
 
-            // First validate the URL
+            console.log('Processing URL:', url);
+
+            // First validate the URL locally
+            const videoId = getYouTubeId(url);
+            if (!videoId) {
+                showError('Invalid YouTube URL format. Please enter a valid YouTube video link.');
+                return;
+            }
+
+            // Then validate on server
             try {
+                updateProgress(10, 'Validating video...');
+                
                 const validateResponse = await fetch(`${API_BASE_URL}/validate`, {
                     method: 'POST',
                     headers: {
@@ -799,14 +810,37 @@
                 });
 
                 const validateData = await validateResponse.json();
-                if (!validateData.success || !validateData.isValid) {
-                    showError('Invalid YouTube URL. Please enter a valid YouTube video link.');
+                
+                if (!validateResponse.ok) {
+                    throw new Error(validateData.error || 'Validation failed');
+                }
+
+                if (!validateData.success) {
+                    throw new Error(validateData.error || 'Validation failed');
+                }
+
+                if (!validateData.isValid) {
+                    let errorMsg = 'Invalid YouTube URL or video not accessible.';
+                    if (validateData.warning) {
+                        errorMsg = validateData.warning;
+                    }
+                    showError(errorMsg);
+                    updateProgress(0);
                     return;
                 }
 
+                if (validateData.warning) {
+                    // Show warning but continue
+                    console.warn('Validation warning:', validateData.warning);
+                }
+
                 currentVideoId = validateData.videoId;
+                console.log('Video ID validated:', currentVideoId);
+                
             } catch (error) {
-                showError('Failed to validate URL. Please check your connection.');
+                console.error('Validation error:', error);
+                showError('Failed to validate URL: ' + getErrorMessage(error));
+                updateProgress(0);
                 return;
             }
             
@@ -1088,20 +1122,47 @@
             }
         }
 
-        // Enhanced YouTube ID extraction
+        // Enhanced YouTube ID extraction with comprehensive patterns
         function getYouTubeId(url) {
-            if (!url) return null;
+            if (!url || typeof url !== 'string') return null;
 
-            // Handle various YouTube URL formats
+            // Clean the URL
+            url = url.trim().replace(/\s+/g, '');
+            
+            // If it's already just an ID
+            if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+                return url;
+            }
+
+            // Comprehensive YouTube URL patterns
             const patterns = [
-                /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^#&?]*)/,
-                /^([a-zA-Z0-9_-]{11})$/
+                // Standard watch URLs
+                /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+                // Short URLs
+                /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+                // Embed URLs
+                /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+                // Old format
+                /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
+                // Mobile URLs
+                /(?:m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+                // Gaming URLs
+                /(?:gaming\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+                // Music URLs
+                /(?:music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
+                // With additional parameters
+                /[?&]v=([a-zA-Z0-9_-]{11})/,
+                // YouTube Shorts
+                /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
             ];
 
             for (const pattern of patterns) {
                 const match = url.match(pattern);
                 if (match && match[1] && match[1].length === 11) {
-                    return match[1];
+                    // Validate the extracted ID
+                    if (/^[a-zA-Z0-9_-]{11}$/.test(match[1])) {
+                        return match[1];
+                    }
                 }
             }
 
@@ -1179,22 +1240,73 @@
             }, 3000);
         }
 
-        // Real-time URL validation
+        // Enhanced real-time URL validation with better feedback
         function setupURLValidation() {
             const urlInput = document.getElementById('youtubeUrl');
             const processBtn = document.getElementById('processBtn');
+            let validationTimeout;
             
             urlInput.addEventListener('input', function() {
                 const url = this.value.trim();
+                
+                // Clear previous timeout
+                if (validationTimeout) {
+                    clearTimeout(validationTimeout);
+                }
+                
+                // Reset styles
+                this.style.borderColor = '#e1e5ea';
+                
+                if (!url) {
+                    return;
+                }
+                
+                // Quick client-side validation
                 const videoId = getYouTubeId(url);
                 
-                if (url && !videoId) {
+                if (url.length > 10 && !videoId) {
                     this.style.borderColor = '#ff6b6b';
+                    this.title = 'Invalid YouTube URL format';
                 } else if (videoId) {
                     this.style.borderColor = '#51cf66';
+                    this.title = 'Valid YouTube URL detected';
+                    
+                    // Debounced server validation
+                    validationTimeout = setTimeout(async () => {
+                        try {
+                            const response = await fetch(`${API_BASE_URL}/validate`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({ url: url })
+                            });
+                            
+                            const data = await response.json();
+                            
+                            if (data.success && data.isValid) {
+                                this.style.borderColor = '#22c55e';
+                                this.title = 'Video is accessible and ready for processing';
+                            } else if (data.warning) {
+                                this.style.borderColor = '#f59e0b';
+                                this.title = data.warning;
+                            } else {
+                                this.style.borderColor = '#ef4444';
+                                this.title = data.error || 'Video may not be accessible';
+                            }
+                        } catch (error) {
+                            console.warn('Real-time validation failed:', error);
+                            // Keep the green border if client-side validation passed
+                        }
+                    }, 1000);
                 } else {
-                    this.style.borderColor = '#e1e5ea';
+                    this.title = 'Enter a YouTube video URL';
                 }
+            });
+            
+            // Clear validation on focus
+            urlInput.addEventListener('focus', function() {
+                this.title = 'Paste your YouTube video URL here';
             });
         }
 
