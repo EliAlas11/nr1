@@ -692,7 +692,7 @@
                 if (!videoId) throw new Error('رابط YouTube غير صالح');
                 
                 // Call API to process video
-                const response = await fetch(`${API_BASE_URL}/process`, {
+                const response = await fetch(`/api/process`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

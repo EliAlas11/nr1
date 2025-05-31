@@ -83,7 +83,7 @@ app.use((err, req, res, next) => {
 });
 
 // بدء الخادم
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`الخادم يعمل على المنفذ ${port}`);
-  console.log(`يمكنك الوصول إلى الموقع من خلال: http://localhost:${port}`);
+  console.log(`يمكنك الوصول إلى الموقع من خلال: http://0.0.0.0:${port}`);
 });
