@@ -14,16 +14,41 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Rate limiting
+// Trust proxy for Replit environment
+app.set('trust proxy', 1);
+
+// Enhanced CORS configuration
+app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Security headers
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+});
+
+// Rate limiting with trust proxy
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 10, // limit each IP to 10 requests per windowMs
-    message: 'Too many requests from this IP, please try again later.'
+    message: {
+        error: 'Too many requests from this IP, please try again later.',
+        retryAfter: Math.ceil(15 * 60 * 1000 / 1000)
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    trustProxy: true
 });
 
-app.use(limiter);
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use('/api', limiter);
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));
@@ -67,67 +92,197 @@ function cleanupOldFiles() {
 // Run cleanup every 30 minutes
 setInterval(cleanupOldFiles, 30 * 60 * 1000);
 
-// Validate YouTube URL
+// Enhanced YouTube URL validation
 function isValidYouTubeUrl(url) {
     try {
+        if (!url || typeof url !== 'string') return false;
+        
+        // Clean the URL
+        url = url.trim();
+        
+        // Check basic YouTube URL patterns
+        const patterns = [
+            /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)/,
+            /^https?:\/\/(www\.)?youtube\.com\/embed\//,
+            /^https?:\/\/(www\.)?youtube\.com\/v\//
+        ];
+        
+        const matchesPattern = patterns.some(pattern => pattern.test(url));
+        if (!matchesPattern) return false;
+        
+        // Use ytdl validation as secondary check
         return ytdl.validateURL(url);
     } catch (error) {
+        console.error('URL validation error:', error.message);
         return false;
     }
 }
 
-// Get video info
-async function getVideoInfo(videoId) {
+// Extract video ID with better error handling
+function extractVideoId(url) {
     try {
-        const url = `https://www.youtube.com/watch?v=${videoId}`;
-        const info = await ytdl.getInfo(url);
-        return {
-            title: info.videoDetails.title,
-            duration: parseInt(info.videoDetails.lengthSeconds),
-            description: info.videoDetails.description,
-            thumbnails: info.videoDetails.thumbnails
-        };
+        const patterns = [
+            /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^#&?]*)/,
+            /^([a-zA-Z0-9_-]{11})$/
+        ];
+
+        for (const pattern of patterns) {
+            const match = url.match(pattern);
+            if (match && match[1] && match[1].length === 11) {
+                return match[1];
+            }
+        }
+        return null;
     } catch (error) {
-        throw new Error('Failed to get video information');
+        console.error('Video ID extraction error:', error.message);
+        return null;
     }
 }
 
-// Download YouTube video
+// Enhanced video info retrieval
+async function getVideoInfo(videoId) {
+    try {
+        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        
+        // Add timeout for the request
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
+        const info = await ytdl.getInfo(url);
+        clearTimeout(timeout);
+        
+        if (!info || !info.videoDetails) {
+            throw new Error('Invalid video information received');
+        }
+        
+        const duration = parseInt(info.videoDetails.lengthSeconds) || 0;
+        
+        // Check duration limits
+        if (duration > 1800) { // 30 minutes
+            throw new Error('Video is too long. Maximum duration is 30 minutes.');
+        }
+        
+        if (duration < 10) { // Minimum 10 seconds
+            throw new Error('Video is too short. Minimum duration is 10 seconds.');
+        }
+        
+        return {
+            title: info.videoDetails.title || 'Unknown Title',
+            duration: duration,
+            description: info.videoDetails.description || '',
+            thumbnails: info.videoDetails.thumbnails || [],
+            viewCount: info.videoDetails.viewCount || '0',
+            author: info.videoDetails.author?.name || 'Unknown Author'
+        };
+    } catch (error) {
+        if (error.message.includes('Video unavailable')) {
+            throw new Error('Video is unavailable, private, or deleted');
+        } else if (error.message.includes('too long') || error.message.includes('too short')) {
+            throw error;
+        } else {
+            console.error('Video info error:', error.message);
+            throw new Error('Failed to get video information. Please check the URL and try again.');
+        }
+    }
+}
+
+// Enhanced video download with better error handling
 async function downloadVideo(videoId) {
     return new Promise((resolve, reject) => {
-        try {
-            const url = `https://www.youtube.com/watch?v=${videoId}`;
-            const outputPath = path.join(tempDir, `${videoId}_original.mp4`);
-            
-            if (fs.existsSync(outputPath)) {
+        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        const outputPath = path.join(tempDir, `${videoId}_original.mp4`);
+        
+        // Check if file already exists and is valid
+        if (fs.existsSync(outputPath)) {
+            const stats = fs.statSync(outputPath);
+            if (stats.size > 0) {
+                console.log('Using cached video:', outputPath);
                 return resolve(outputPath);
+            } else {
+                // Remove empty file
+                fs.unlinkSync(outputPath);
             }
+        }
 
-            const stream = ytdl(url, { 
-                quality: 'highestvideo',
-                filter: format => format.container === 'mp4'
+        let downloadTimeout;
+        let stream;
+        let writeStream;
+
+        try {
+            console.log('Starting download for video:', videoId);
+            
+            // Set download timeout (5 minutes)
+            downloadTimeout = setTimeout(() => {
+                if (stream) stream.destroy();
+                if (writeStream) writeStream.destroy();
+                // Clean up partial file
+                if (fs.existsSync(outputPath)) {
+                    fs.unlinkSync(outputPath);
+                }
+                reject(new Error('Download timeout - video may be too large or network is slow'));
+            }, 5 * 60 * 1000);
+
+            stream = ytdl(url, { 
+                quality: 'highest',
+                filter: format => format.container === 'mp4' && format.hasVideo && format.hasAudio
             });
 
-            const writeStream = fs.createWriteStream(outputPath);
+            writeStream = fs.createWriteStream(outputPath);
             
             stream.pipe(writeStream);
             
             stream.on('error', (error) => {
-                console.error('Download error:', error);
-                reject(new Error('Failed to download video'));
+                clearTimeout(downloadTimeout);
+                console.error('Download stream error:', error);
+                
+                // Clean up partial file
+                if (fs.existsSync(outputPath)) {
+                    fs.unlinkSync(outputPath);
+                }
+                
+                if (error.message.includes('Video unavailable')) {
+                    reject(new Error('Video is unavailable, private, or age-restricted'));
+                } else {
+                    reject(new Error('Failed to download video. Please try a different video.'));
+                }
             });
             
             writeStream.on('finish', () => {
-                resolve(outputPath);
+                clearTimeout(downloadTimeout);
+                console.log('Download completed:', outputPath);
+                
+                // Verify file size
+                const stats = fs.statSync(outputPath);
+                if (stats.size < 1000) { // Less than 1KB indicates a problem
+                    fs.unlinkSync(outputPath);
+                    reject(new Error('Downloaded file is corrupted or empty'));
+                } else {
+                    resolve(outputPath);
+                }
             });
             
             writeStream.on('error', (error) => {
-                console.error('Write error:', error);
-                reject(new Error('Failed to save video'));
+                clearTimeout(downloadTimeout);
+                console.error('Write stream error:', error);
+                
+                // Clean up partial file
+                if (fs.existsSync(outputPath)) {
+                    fs.unlinkSync(outputPath);
+                }
+                
+                reject(new Error('Failed to save video file'));
+            });
+            
+            // Track download progress
+            let downloadedSize = 0;
+            stream.on('data', (chunk) => {
+                downloadedSize += chunk.length;
             });
             
         } catch (error) {
-            reject(error);
+            clearTimeout(downloadTimeout);
+            console.error('Download setup error:', error);
+            reject(new Error('Failed to initialize video download'));
         }
     });
 }
@@ -173,44 +328,48 @@ async function createViralClip(inputPath, videoId) {
     });
 }
 
-// API route for video processing
+// Enhanced API route for video processing
 app.post('/api/process', async (req, res) => {
+    let downloadedPath = null;
+    
     try {
-        const { videoId } = req.body;
+        // Extract video ID from URL or use direct ID
+        let videoId = req.body.videoId;
+        const { url } = req.body;
+        
+        if (url && !videoId) {
+            videoId = extractVideoId(url);
+        }
         
         if (!videoId) {
             return res.status(400).json({ 
                 success: false, 
-                error: 'Video ID is required' 
+                error: 'Valid YouTube URL or video ID is required' 
             });
         }
 
-        const url = `https://www.youtube.com/watch?v=${videoId}`;
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         
-        if (!isValidYouTubeUrl(url)) {
+        if (!isValidYouTubeUrl(videoUrl)) {
             return res.status(400).json({ 
                 success: false, 
-                error: 'Invalid YouTube URL' 
+                error: 'Invalid YouTube URL. Please check the URL and try again.' 
             });
         }
 
         console.log('Processing video:', videoId);
 
-        // Get video info
+        // Get video info first
         const videoInfo = await getVideoInfo(videoId);
-        
-        if (videoInfo.duration > 1800) { // 30 minutes limit
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Video is too long. Please use videos shorter than 30 minutes.' 
-            });
-        }
+        console.log('Video info retrieved:', videoInfo.title);
 
         // Download video
-        const downloadedPath = await downloadVideo(videoId);
+        downloadedPath = await downloadVideo(videoId);
+        console.log('Video downloaded:', downloadedPath);
         
         // Create viral clip
         const viralClipPath = await createViralClip(downloadedPath, videoId);
+        console.log('Viral clip created:', viralClipPath);
         
         const clipId = path.basename(viralClipPath, '.mp4');
         
@@ -219,14 +378,45 @@ app.post('/api/process', async (req, res) => {
             videoId: clipId,
             url: `/api/videos/${clipId}`,
             originalTitle: videoInfo.title,
+            originalAuthor: videoInfo.author,
+            duration: videoInfo.duration,
             message: 'Viral clip created successfully!'
         });
 
     } catch (error) {
         console.error('Processing error:', error);
-        res.status(500).json({ 
+        
+        // Clean up downloaded file on error
+        if (downloadedPath && fs.existsSync(downloadedPath)) {
+            try {
+                fs.unlinkSync(downloadedPath);
+                console.log('Cleaned up partial download');
+            } catch (cleanupError) {
+                console.error('Cleanup error:', cleanupError);
+            }
+        }
+        
+        // Return appropriate error message
+        let errorMessage = 'Failed to process video';
+        let statusCode = 500;
+        
+        if (error.message.includes('unavailable') || error.message.includes('private')) {
+            statusCode = 400;
+            errorMessage = error.message;
+        } else if (error.message.includes('too long') || error.message.includes('too short')) {
+            statusCode = 400;
+            errorMessage = error.message;
+        } else if (error.message.includes('timeout')) {
+            statusCode = 408;
+            errorMessage = 'Processing timeout. Please try a shorter video.';
+        } else if (error.message.includes('network') || error.message.includes('download')) {
+            statusCode = 503;
+            errorMessage = 'Network error. Please check your connection and try again.';
+        }
+        
+        res.status(statusCode).json({ 
             success: false, 
-            error: error.message || 'Failed to process video' 
+            error: errorMessage
         });
     }
 });
@@ -311,21 +501,78 @@ app.get('/api/videos/sample', (req, res) => {
         .run();
 });
 
-// Video info route
+// Enhanced video info route
 app.get('/api/info/:videoId', async (req, res) => {
     try {
         const { videoId } = req.params;
+        
+        if (!videoId || videoId.length !== 11) {
+            return res.status(400).json({ 
+                error: 'Invalid video ID format' 
+            });
+        }
+        
         const url = `https://www.youtube.com/watch?v=${videoId}`;
         
         if (!isValidYouTubeUrl(url)) {
-            return res.status(400).json({ error: 'Invalid YouTube URL' });
+            return res.status(400).json({ 
+                error: 'Invalid YouTube video ID' 
+            });
         }
         
         const info = await getVideoInfo(videoId);
-        res.json(info);
+        res.json({
+            success: true,
+            ...info
+        });
         
     } catch (error) {
-        res.status(500).json({ error: 'Failed to get video info' });
+        console.error('Video info error:', error);
+        
+        let errorMessage = 'Failed to get video information';
+        let statusCode = 500;
+        
+        if (error.message.includes('unavailable') || error.message.includes('private')) {
+            statusCode = 404;
+            errorMessage = error.message;
+        } else if (error.message.includes('too long') || error.message.includes('too short')) {
+            statusCode = 400;
+            errorMessage = error.message;
+        }
+        
+        res.status(statusCode).json({ 
+            success: false,
+            error: errorMessage 
+        });
+    }
+});
+
+// Add endpoint to validate YouTube URL
+app.post('/api/validate', (req, res) => {
+    try {
+        const { url } = req.body;
+        
+        if (!url) {
+            return res.status(400).json({
+                success: false,
+                error: 'URL is required'
+            });
+        }
+        
+        const videoId = extractVideoId(url);
+        const isValid = isValidYouTubeUrl(url);
+        
+        res.json({
+            success: true,
+            isValid,
+            videoId: isValid ? videoId : null
+        });
+        
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Validation failed'
+        });
     }
 });
 

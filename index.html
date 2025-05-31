@@ -722,23 +722,45 @@
             }
         }
 
-        // Video info display
+        // Enhanced video info display
         async function showVideoInfo(videoId) {
+            const videoInfoDiv = document.getElementById('videoInfo');
+            
             try {
+                // Show loading state
+                videoInfoDiv.innerHTML = `
+                    <h3><i class="fas fa-spinner fa-spin"></i> Loading Video Information...</h3>
+                `;
+                videoInfoDiv.style.display = 'block';
+
                 const response = await fetch(`${API_BASE_URL}/info/${videoId}`);
-                if (response.ok) {
-                    const info = await response.json();
-                    const videoInfoDiv = document.getElementById('videoInfo');
+                const info = await response.json();
+                
+                if (response.ok && info.success) {
+                    const minutes = Math.floor(info.duration / 60);
+                    const seconds = (info.duration % 60).toString().padStart(2, '0');
                     
                     videoInfoDiv.innerHTML = `
                         <h3><i class="fas fa-info-circle"></i> Video Information</h3>
                         <p><strong>Title:</strong> ${info.title}</p>
-                        <p><strong>Duration:</strong> ${Math.floor(info.duration / 60)}:${(info.duration % 60).toString().padStart(2, '0')}</p>
+                        <p><strong>Author:</strong> ${info.author}</p>
+                        <p><strong>Duration:</strong> ${minutes}:${seconds}</p>
+                        <p><strong>Views:</strong> ${parseInt(info.viewCount).toLocaleString()}</p>
+                        <div class="success">
+                            <i class="fas fa-check"></i> Video is ready for processing!
+                        </div>
                     `;
-                    videoInfoDiv.style.display = 'block';
+                } else {
+                    throw new Error(info.error || 'Failed to get video information');
                 }
             } catch (error) {
-                console.log('Could not fetch video info:', error);
+                console.error('Video info error:', error);
+                videoInfoDiv.innerHTML = `
+                    <h3><i class="fas fa-exclamation-triangle"></i> Video Information</h3>
+                    <div class="error">
+                        ${getErrorMessage(error)}
+                    </div>
+                `;
             }
         }
 
@@ -751,16 +773,30 @@
                 return;
             }
 
-            const videoId = getYouTubeId(url);
-            if (!videoId) {
-                showError('Invalid YouTube URL. Please enter a valid YouTube video link.');
+            // First validate the URL
+            try {
+                const validateResponse = await fetch(`${API_BASE_URL}/validate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const validateData = await validateResponse.json();
+                if (!validateData.success || !validateData.isValid) {
+                    showError('Invalid YouTube URL. Please enter a valid YouTube video link.');
+                    return;
+                }
+
+                currentVideoId = validateData.videoId;
+            } catch (error) {
+                showError('Failed to validate URL. Please check your connection.');
                 return;
             }
-
-            currentVideoId = videoId;
             
             // Show video info
-            await showVideoInfo(videoId);
+            await showVideoInfo(currentVideoId);
 
             const loader = document.getElementById('loader');
             const resultDiv = document.getElementById('result');
@@ -774,23 +810,25 @@
             simulateProgress();
 
             try {
-                console.log('Processing video ID:', videoId);
+                console.log('Processing video ID:', currentVideoId);
 
                 const response = await fetch(`${API_BASE_URL}/process`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ videoId: videoId })
+                    body: JSON.stringify({ 
+                        videoId: currentVideoId,
+                        url: url 
+                    })
                 });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Server error: ${response.status}`);
-                }
 
                 const data = await response.json();
                 console.log('Response data:', data);
+
+                if (!response.ok) {
+                    throw new Error(data.error || `Server error: ${response.status}`);
+                }
 
                 if (!data.success) {
                     throw new Error(data.error || 'Failed to process video');
@@ -805,7 +843,7 @@
             } catch (error) {
                 console.error('Error processing video:', error);
                 updateProgress(0);
-                showError(error.message);
+                showError(getErrorMessage(error));
             } finally {
                 setLoadingState(false);
                 loader.style.display = 'none';
@@ -813,6 +851,27 @@
                     clearInterval(progressInterval);
                 }
             }
+        }
+
+        // Enhanced error message handling
+        function getErrorMessage(error) {
+            const message = error.message || 'An error occurred';
+            
+            if (message.includes('unavailable') || message.includes('private')) {
+                return 'This video is unavailable, private, or deleted. Please try a different video.';
+            } else if (message.includes('too long')) {
+                return 'Video is too long. Please use videos shorter than 30 minutes.';
+            } else if (message.includes('too short')) {
+                return 'Video is too short. Please use videos longer than 10 seconds.';
+            } else if (message.includes('timeout')) {
+                return 'Processing timeout. Please try a shorter video or check your connection.';
+            } else if (message.includes('network') || message.includes('connection')) {
+                return 'Network error. Please check your internet connection and try again.';
+            } else if (message.includes('rate limit')) {
+                return 'Too many requests. Please wait a few minutes before trying again.';
+            }
+            
+            return message;
         }
 
         // Realistic progress simulation
