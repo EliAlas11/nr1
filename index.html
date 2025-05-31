@@ -1,11 +1,12 @@
+
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Viral Clip Generator</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary-color: #ff0040;
@@ -27,7 +28,7 @@
         }
         
         body { 
-            font-family: 'Cairo', Arial, sans-serif;
+            font-family: 'Inter', Arial, sans-serif;
             background: linear-gradient(135deg, #f6f9fc 0%, #eef2f7 100%);
             color: var(--text-color);
             padding: 20px;
@@ -76,7 +77,7 @@
         
         .header h1 i {
             color: var(--primary-color);
-            margin-left: 10px;
+            margin-right: 10px;
         }
         
         .header p {
@@ -108,7 +109,7 @@
             border: 2px solid #e1e5ea;
             border-radius: var(--border-radius);
             transition: var(--transition);
-            font-family: 'Cairo', Arial, sans-serif;
+            font-family: 'Inter', Arial, sans-serif;
             direction: ltr;
         }
         
@@ -142,11 +143,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Cairo', Arial, sans-serif;
+            font-family: 'Inter', Arial, sans-serif;
         }
         
         button i {
-            margin-left: 8px;
+            margin-right: 8px;
         }
         
         button:hover {
@@ -204,7 +205,7 @@
         
         .result h2 i {
             color: var(--primary-color);
-            margin-left: 10px;
+            margin-right: 10px;
         }
         
         .video-container {
@@ -243,7 +244,7 @@
         }
         
         .actions a i {
-            margin-left: 8px;
+            margin-right: 8px;
         }
         
         .actions a:hover {
@@ -326,7 +327,7 @@
         .theme-toggle {
             position: absolute;
             top: 20px;
-            left: 20px;
+            right: 20px;
             background: none;
             border: none;
             color: var(--secondary-color);
@@ -455,7 +456,7 @@
         
         <div class="header">
             <h1><i class="fas fa-fire"></i> Viral Clip Generator</h1>
-            <p>حوّل فيديوهات YouTube إلى مقاطع فيرالية مثالية لـ TikTok وReels وShorts</p>
+            <p>Transform YouTube videos into viral clips perfect for TikTok, Reels, and Shorts</p>
         </div>
         
         <div class="input-group">
@@ -465,35 +466,35 @@
         
         <div class="btn-group">
             <button onclick="processVideo()" id="processBtn">
-                <i class="fas fa-magic"></i> إنشاء مقطع فيرالي
+                <i class="fas fa-magic"></i> Create Viral Clip
             </button>
             <button class="btn-secondary" onclick="showExamples()" id="examplesBtn">
-                <i class="fas fa-lightbulb"></i> عرض أمثلة
+                <i class="fas fa-lightbulb"></i> Show Examples
             </button>
         </div>
         
         <div class="loader" id="loader"></div>
         
         <div class="result" id="result">
-            <h2><i class="fas fa-check-circle"></i> مقطعك الفيرالي جاهز!</h2>
+            <h2><i class="fas fa-check-circle"></i> Your Viral Clip is Ready!</h2>
             
             <div class="video-container">
                 <video controls autoplay id="resultVideo">
                     <source src="" type="video/mp4">
-                    متصفحك لا يدعم تشغيل الفيديو.
+                    Your browser does not support video playback.
                 </video>
             </div>
             
             <div class="actions">
                 <a href="#" download="viral-clip.mp4" id="downloadLink">
-                    <i class="fas fa-download"></i> تنزيل المقطع
+                    <i class="fas fa-download"></i> Download Clip
                 </a>
                 <a href="#" id="shareLink">
-                    <i class="fas fa-share-alt"></i> مشاركة
+                    <i class="fas fa-share-alt"></i> Share
                 </a>
             </div>
             
-            <p>شارك مباشرة على:</p>
+            <p>Share directly on:</p>
             <div class="platform-icons">
                 <i class="fab fa-tiktok"></i>
                 <i class="fab fa-instagram"></i>
@@ -506,28 +507,28 @@
         <div class="features">
             <div class="feature">
                 <i class="fas fa-robot"></i>
-                <h3>ذكاء اصطناعي</h3>
-                <p>يحدد تلقائياً أفضل اللحظات في الفيديو</p>
+                <h3>AI Intelligence</h3>
+                <p>Automatically identifies the best moments in your video</p>
             </div>
             <div class="feature">
                 <i class="fas fa-volume-up"></i>
-                <h3>مؤثرات صوتية</h3>
-                <p>يضيف مؤثرات صوتية تجعل المقطع أكثر جاذبية</p>
+                <h3>Sound Effects</h3>
+                <p>Adds engaging audio effects to make clips more captivating</p>
             </div>
             <div class="feature">
                 <i class="fas fa-mobile-alt"></i>
-                <h3>متوافق مع الجوال</h3>
-                <p>يعمل على جميع الأجهزة والمتصفحات</p>
+                <h3>Mobile Friendly</h3>
+                <p>Works on all devices and browsers</p>
             </div>
         </div>
         
         <div class="footer">
-            <p>© 2025 Viral Clip Generator - جميع الحقوق محفوظة</p>
+            <p>© 2025 Viral Clip Generator - All Rights Reserved</p>
         </div>
     </div>
 
     <script>
-        // تكوين API
+        // API Configuration
         const API_BASE_URL = '/api';
         
         // Device detection
@@ -671,7 +672,7 @@
         async function processVideo() {
             const url = document.getElementById('youtubeUrl').value;
             if (!url) {
-                alert('الرجاء إدخال رابط فيديو YouTube');
+                alert('Please enter a YouTube video URL');
                 return;
             }
             
@@ -689,7 +690,7 @@
             try {
                 // Get YouTube video ID
                 const videoId = getYouTubeId(url);
-                if (!videoId) throw new Error('رابط YouTube غير صالح');
+                if (!videoId) throw new Error('Invalid YouTube URL');
                 
                 // Call API to process video
                 const response = await fetch(`/api/process`, {
@@ -701,13 +702,13 @@
                 });
                 
                 if (!response.ok) {
-                    throw new Error('فشل في معالجة الفيديو');
+                    throw new Error('Failed to process video');
                 }
                 
                 const data = await response.json();
                 
                 if (!data.success) {
-                    throw new Error(data.error || 'فشل في معالجة الفيديو');
+                    throw new Error(data.error || 'Failed to process video');
                 }
                 
                 // Update video source and download link
@@ -715,13 +716,13 @@
                 const videoSource = resultVideo.querySelector('source');
                 const downloadLink = document.getElementById('downloadLink');
                 
-                // استخدام عنوان URL كامل للفيديو
+                // Use full URL for video
                 const videoUrl = window.location.origin + data.url;
                 
                 videoSource.src = videoUrl;
-                resultVideo.load(); // إعادة تحميل الفيديو بعد تغيير المصدر
+                resultVideo.load(); // Reload video after changing source
                 
-                // تحديث رابط التنزيل
+                // Update download link
                 downloadLink.href = videoUrl;
                 downloadLink.setAttribute('download', `viral-clip-${data.videoId}.mp4`);
                 
@@ -733,7 +734,7 @@
                 
             } catch (error) {
                 // Show error message
-                resultDiv.innerHTML = `<p class="error"><i class="fas fa-exclamation-circle"></i> خطأ: ${error.message}</p>`;
+                resultDiv.innerHTML = `<p class="error"><i class="fas fa-exclamation-circle"></i> Error: ${error.message}</p>`;
                 resultDiv.style.display = 'block';
             } finally {
                 // Re-enable buttons and hide loader
@@ -745,23 +746,23 @@
         
         // Show examples function
         function showExamples() {
-            // في التطبيق الحقيقي، سيتم عرض أمثلة لمقاطع فيرالية
-            // هنا نقوم بتحميل فيديو العينة مباشرة
+            // In a real application, this would show examples of viral clips
+            // Here we directly load a sample video
             const resultVideo = document.getElementById('resultVideo');
             const videoSource = resultVideo.querySelector('source');
             const downloadLink = document.getElementById('downloadLink');
             
-            // استخدام عنوان URL كامل للفيديو
+            // Use full URL for video
             const videoUrl = window.location.origin + '/api/videos/sample';
             
             videoSource.src = videoUrl;
-            resultVideo.load(); // إعادة تحميل الفيديو بعد تغيير المصدر
+            resultVideo.load(); // Reload video after changing source
             
-            // تحديث رابط التنزيل
+            // Update download link
             downloadLink.href = videoUrl;
             downloadLink.setAttribute('download', 'viral-clip-example.mp4');
             
-            // عرض النتيجة
+            // Show result
             document.getElementById('result').style.display = 'block';
             document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
         }
@@ -780,14 +781,14 @@
             // Check if Web Share API is supported
             if (navigator.share) {
                 navigator.share({
-                    title: 'مقطع فيرالي من Viral Clip Generator',
-                    text: 'شاهد هذا المقطع الفيرالي الذي أنشأته باستخدام Viral Clip Generator!',
+                    title: 'Viral Clip from Viral Clip Generator',
+                    text: 'Check out this viral clip I created using Viral Clip Generator!',
                     url: window.location.href
                 })
                 .catch(error => console.log('Error sharing:', error));
             } else {
                 // Fallback for browsers that don't support Web Share API
-                alert('يمكنك نسخ رابط الصفحة ومشاركته يدوياً');
+                alert('You can copy the page URL and share it manually');
             }
         });
         

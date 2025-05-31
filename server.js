@@ -1,7 +1,7 @@
 /**
- * تكامل جميع تحسينات التوافق مع خادم Express
- * هذا الملف يقوم بدمج جميع التحسينات في خادم واحد
- * تم تعديله ليكون متوافقاً مع منصة Render.com
+ * Complete Express server with all compatibility improvements
+ * This file combines all optimizations into a single server
+ * Modified to be compatible with Render.com platform
  */
 
 const express = require('express');
@@ -11,47 +11,47 @@ const fs = require('fs');
 const videoRoutes = require('./routes/video-routes');
 
 const app = express();
-// استخدام المنفذ الذي توفره Render أو المنفذ 3000 محلياً
+// Use the port provided by Render or port 3000 locally
 const port = process.env.PORT || 3000;
 
-// تمكين CORS لجميع الطلبات
+// Enable CORS for all requests
 app.use(cors());
 
-// تحليل طلبات JSON
+// Parse JSON requests
 app.use(express.json());
 
-// تقديم الملفات الثابتة
+// Serve static files
 app.use(express.static(path.join(__dirname)));
 app.use('/static', express.static(path.join(__dirname, 'src', 'static')));
 
-// تسجيل مسارات الفيديو
+// Register video routes
 app.use('/api', videoRoutes);
 
-// مسار API لمعالجة الفيديو (محاكاة)
+// API route for video processing (simulation)
 app.post('/api/process', (req, res) => {
   const { videoId } = req.body;
   
   if (!videoId) {
-    return res.status(400).json({ error: 'معرف الفيديو مطلوب' });
+    return res.status(400).json({ error: 'Video ID is required' });
   }
   
-  // محاكاة معالجة الفيديو
+  // Simulate video processing
   setTimeout(() => {
-    // إنشاء معرف فريد للفيديو المعالج
+    // Generate unique ID for processed video
     const processedId = `processed_${Date.now()}`;
     
-    // في التطبيق الحقيقي، سنقوم بمعالجة الفيديو وحفظه
-    // هنا نقوم فقط بنسخ ملف العينة
+    // In a real application, we would process and save the video
+    // Here we just copy the sample file
     const samplePath = path.join(__dirname, 'videos', 'sample.mp4');
     const processedPath = path.join(__dirname, 'videos', 'processed', `${processedId}.mp4`);
     
     try {
-      // التأكد من وجود المجلد
+      // Ensure the directory exists
       if (!fs.existsSync(path.join(__dirname, 'videos', 'processed'))) {
         fs.mkdirSync(path.join(__dirname, 'videos', 'processed'), { recursive: true });
       }
       
-      // نسخ ملف العينة
+      // Copy sample file
       fs.copyFileSync(samplePath, processedPath);
       
       res.json({
@@ -60,30 +60,30 @@ app.post('/api/process', (req, res) => {
         url: `/api/videos/${processedId}`
       });
     } catch (error) {
-      console.error('خطأ في معالجة الفيديو:', error);
-      res.status(500).json({ error: 'فشل في معالجة الفيديو' });
+      console.error('Error processing video:', error);
+      res.status(500).json({ error: 'Failed to process video' });
     }
-  }, 2000); // محاكاة تأخير المعالجة
+  }, 2000); // Simulate processing delay
 });
 
-// مسار الصفحة الرئيسية
+// Homepage route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// مسار فحص الصحة لـ Render
+// Health check route for Render
 app.get('/health', (req, res) => {
-  res.status(200).send('الخادم يعمل بشكل صحيح');
+  res.status(200).send('Server is running properly');
 });
 
-// معالجة الأخطاء
+// Error handling
 app.use((err, req, res, next) => {
-  console.error('خطأ في الخادم:', err);
-  res.status(500).send('حدث خطأ في الخادم');
+  console.error('Server error:', err);
+  res.status(500).send('Server error occurred');
 });
 
-// بدء الخادم
+// Start server
 app.listen(port, '0.0.0.0', () => {
-  console.log(`الخادم يعمل على المنفذ ${port}`);
-  console.log(`يمكنك الوصول إلى الموقع من خلال: http://0.0.0.0:${port}`);
+  console.log(`Server running on port ${port}`);
+  console.log(`You can access the site at: http://0.0.0.0:${port}`);
 });
