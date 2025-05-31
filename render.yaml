@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: viral-clip-generator
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+    healthCheckPath: /
+    autoDeploy: true
+    disk:
+      name: viral-clips-data
+      mountPath: /opt/render/project/src/videos
+      sizeGB: 1
