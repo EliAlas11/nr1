@@ -137,37 +137,54 @@ function extractVideoId(url) {
     }
 }
 
-// Fixed video info retrieval without AbortController
+// Enhanced video info retrieval with better error handling
 async function getVideoInfo(videoId) {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
+            console.log('⏰ Video info timeout for:', videoId);
             reject(new Error('Request timeout - video may be unavailable'));
         }, 30000);
 
         try {
             const url = `https://www.youtube.com/watch?v=${videoId}`;
+            console.log('🔍 Getting video info for:', videoId, 'URL:', url);
 
             if (!videoId || videoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(videoId)) {
                 clearTimeout(timeout);
+                console.error('❌ Invalid video ID format:', videoId);
                 reject(new Error('Invalid video ID format'));
                 return;
             }
 
+            // First validate the URL
+            if (!ytdl.validateURL(url)) {
+                clearTimeout(timeout);
+                console.error('❌ Invalid YouTube URL:', url);
+                reject(new Error('Invalid YouTube URL'));
+                return;
+            }
+
+            console.log('✅ URL validation passed, getting info...');
+
             ytdl.getInfo(url, {
                 requestOptions: {
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9'
                     }
                 }
             }).then(info => {
                 clearTimeout(timeout);
+                console.log('📄 Raw video info received');
 
                 if (!info || !info.videoDetails) {
+                    console.error('❌ No video details in response');
                     reject(new Error('Invalid video information received'));
                     return;
                 }
 
                 const duration = parseInt(info.videoDetails.lengthSeconds) || 0;
+                console.log('⏱️ Video duration:', duration, 'seconds');
 
                 if (duration > 1800) {
                     reject(new Error('Video is too long. Maximum duration is 30 minutes.'));
@@ -188,26 +205,37 @@ async function getVideoInfo(videoId) {
                     author: info.videoDetails.author?.name || 'Unknown Author'
                 };
 
-                console.log('✅ Video info retrieved:', result.title);
+                console.log('✅ Video info retrieved successfully:', result.title);
                 resolve(result);
 
             }).catch(error => {
                 clearTimeout(timeout);
-                console.error('Video info error:', error.message);
+                console.error('❌ ytdl.getInfo error:', error.message);
+                console.error('❌ Full error object:', error);
+
+                let errorMessage = 'Failed to get video information';
 
                 if (error.message.includes('Video unavailable')) {
-                    reject(new Error('Video is unavailable, private, or deleted'));
+                    errorMessage = 'Video is unavailable, private, or deleted';
                 } else if (error.message.includes('Sign in')) {
-                    reject(new Error('Age-restricted video - cannot access'));
+                    errorMessage = 'Age-restricted video - cannot access';
+                } else if (error.message.includes('This video is not available')) {
+                    errorMessage = 'Video is not available in this region';
+                } else if (error.message.includes('Private video')) {
+                    errorMessage = 'This is a private video';
+                } else if (error.message.includes('429')) {
+                    errorMessage = 'Too many requests - please try again later';
                 } else {
-                    reject(new Error('Failed to get video information. Please check the URL and try again.'));
+                    errorMessage = `Failed to access video: ${error.message}`;
                 }
+
+                reject(new Error(errorMessage));
             });
 
         } catch (error) {
             clearTimeout(timeout);
-            console.error('Video info setup error:', error);
-            reject(new Error('Failed to initialize video info request'));
+            console.error('❌ Video info setup error:', error);
+            reject(new Error('Failed to initialize video info request: ' + error.message));
         }
     });
 }

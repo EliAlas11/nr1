@@ -728,13 +728,17 @@
             const videoInfoDiv = document.getElementById('videoInfo');
 
             try {
+                console.log('📄 Fetching video info for:', videoId);
                 videoInfoDiv.innerHTML = `
                     <h3><i class="fas fa-spinner fa-spin"></i> Loading Video Information...</h3>
                 `;
                 videoInfoDiv.style.display = 'block';
 
                 const response = await fetch(`${API_BASE_URL}/info/${videoId}`);
+                console.log('📄 Video info response status:', response.status);
+                
                 const info = await response.json();
+                console.log('📄 Video info data:', info);
 
                 if (response.ok && info.success) {
                     const minutes = Math.floor(info.duration / 60);
@@ -751,14 +755,21 @@
                         </div>
                     `;
                 } else {
-                    throw new Error(info.error || 'Failed to get video information');
+                    throw new Error(info.error || `Failed to get video information (Status: ${response.status})`);
                 }
             } catch (error) {
                 console.error('Video info error:', error);
                 videoInfoDiv.innerHTML = `
-                    <h3><i class="fas fa-exclamation-triangle"></i> Video Information</h3>
+                    <h3><i class="fas fa-exclamation-triangle"></i> Video Information Error</h3>
                     <div style="color: #fd746c; padding: 15px; background: rgba(253, 116, 108, 0.1); border-radius: 8px;">
-                        ${error.message}
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <div style="margin-top: 10px; font-size: 0.9rem;">
+                            <strong>Common causes:</strong><br>
+                            • Video is private or deleted<br>
+                            • Age-restricted content<br>
+                            • Regional restrictions<br>
+                            • Invalid YouTube URL
+                        </div>
                     </div>
                 `;
             }
@@ -773,17 +784,21 @@
                 return;
             }
 
+            console.log('🚀 Starting video processing for URL:', url);
+
             const videoId = extractVideoId(url);
             if (!videoId) {
                 showNotification('Invalid YouTube URL format', 'error');
                 return;
             }
 
+            console.log('🆔 Processing video ID:', videoId);
             setLoadingState(true);
 
             try {
                 // Validate URL first
                 updateProgress(10, 'Validating video...');
+                console.log('🔍 Validating video...');
 
                 const validateResponse = await fetch(`${API_BASE_URL}/validate`, {
                     method: 'POST',
@@ -792,21 +807,24 @@
                 });
 
                 const validateData = await validateResponse.json();
+                console.log('✅ Validation response:', validateData);
 
                 if (!validateData.success || !validateData.isValid) {
                     throw new Error(validateData.error || validateData.warning || 'Video validation failed');
                 }
 
                 currentVideoId = validateData.videoId;
+                console.log('✅ Video validated, ID:', currentVideoId);
 
                 // Show video info
+                updateProgress(15, 'Getting video information...');
                 await showVideoInfo(currentVideoId);
 
                 // Simulate progress
                 const progressStages = [
-                    { percent: 20, text: 'Downloading video...' },
-                    { percent: 40, text: 'Analyzing content...' },
-                    { percent: 60, text: 'Finding best moments...' },
+                    { percent: 25, text: 'Preparing download...' },
+                    { percent: 40, text: 'Downloading video...' },
+                    { percent: 60, text: 'Analyzing content...' },
                     { percent: 80, text: 'Creating viral clip...' },
                     { percent: 95, text: 'Finalizing...' }
                 ];
@@ -820,21 +838,24 @@
                     } else {
                         clearInterval(progressInterval);
                     }
-                }, 2000);
+                }, 3000);
 
                 // Process video
+                console.log('🎬 Starting video processing...');
                 const response = await fetch(`${API_BASE_URL}/process`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ videoId: currentVideoId, url: url })
                 });
 
+                console.log('📥 Process response status:', response.status);
                 const data = await response.json();
+                console.log('📥 Process response data:', data);
 
                 clearInterval(progressInterval);
 
                 if (!response.ok || !data.success) {
-                    throw new Error(data.error || 'Failed to process video');
+                    throw new Error(data.error || `Processing failed (Status: ${response.status})`);
                 }
 
                 updateProgress(100, 'Complete!');
@@ -844,7 +865,7 @@
                 }, 1000);
 
             } catch (error) {
-                console.error('Processing error:', error);
+                console.error('❌ Processing error:', error);
                 updateProgress(0);
                 showError(error.message);
                 showNotification(error.message, 'error');
