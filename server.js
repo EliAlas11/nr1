@@ -20,7 +20,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Enhanced trust proxy configuration for Replit
-app.set('trust proxy', true);
+app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
 // CORS configuration
 app.use(cors({
@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 // Fixed rate limiting for Replit environment
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // limit each IP to 50 requests per windowMs
+    max: 100, // increased limit for development
     message: {
         error: 'Too many requests from this IP, please try again later.',
         retryAfter: 15 * 60
@@ -49,6 +49,9 @@ const limiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     trustProxy: true,
+    keyGenerator: (req) => {
+        return req.ip || req.connection.remoteAddress || 'unknown';
+    },
     skip: (req) => {
         return req.path === '/health' || 
                req.path.startsWith('/api/videos/') || 
@@ -157,10 +160,17 @@ async function getVideoInfo(videoId) {
             }
 
             // First validate the URL
-            if (!ytdl.validateURL(url)) {
+            try {
+                if (!ytdl.validateURL(url)) {
+                    clearTimeout(timeout);
+                    console.error('❌ Invalid YouTube URL:', url);
+                    reject(new Error('Invalid YouTube URL'));
+                    return;
+                }
+            } catch (validateError) {
                 clearTimeout(timeout);
-                console.error('❌ Invalid YouTube URL:', url);
-                reject(new Error('Invalid YouTube URL'));
+                console.error('❌ URL validation error:', validateError);
+                reject(new Error('Failed to validate YouTube URL: ' + validateError.message));
                 return;
             }
 
@@ -210,23 +220,27 @@ async function getVideoInfo(videoId) {
 
             }).catch(error => {
                 clearTimeout(timeout);
-                console.error('❌ ytdl.getInfo error:', error.message);
-                console.error('❌ Full error object:', error);
-
+                console.error('❌ ytdl.getInfo error:', error);
+                
                 let errorMessage = 'Failed to get video information';
 
-                if (error.message.includes('Video unavailable')) {
-                    errorMessage = 'Video is unavailable, private, or deleted';
-                } else if (error.message.includes('Sign in')) {
-                    errorMessage = 'Age-restricted video - cannot access';
-                } else if (error.message.includes('This video is not available')) {
-                    errorMessage = 'Video is not available in this region';
-                } else if (error.message.includes('Private video')) {
-                    errorMessage = 'This is a private video';
-                } else if (error.message.includes('429')) {
-                    errorMessage = 'Too many requests - please try again later';
+                if (error && error.message) {
+                    if (error.message.includes('Video unavailable')) {
+                        errorMessage = 'Video is unavailable, private, or deleted';
+                    } else if (error.message.includes('Sign in')) {
+                        errorMessage = 'Age-restricted video - cannot access';
+                    } else if (error.message.includes('This video is not available')) {
+                        errorMessage = 'Video is not available in this region';
+                    } else if (error.message.includes('Private video')) {
+                        errorMessage = 'This is a private video';
+                    } else if (error.message.includes('429')) {
+                        errorMessage = 'Too many requests - please try again later';
+                    } else {
+                        errorMessage = `Failed to access video: ${error.message}`;
+                    }
                 } else {
-                    errorMessage = `Failed to access video: ${error.message}`;
+                    errorMessage = 'Unknown error occurred while getting video information';
+                    console.error('❌ Empty or undefined error object:', error);
                 }
 
                 reject(new Error(errorMessage));
@@ -235,7 +249,7 @@ async function getVideoInfo(videoId) {
         } catch (error) {
             clearTimeout(timeout);
             console.error('❌ Video info setup error:', error);
-            reject(new Error('Failed to initialize video info request: ' + error.message));
+            reject(new Error('Failed to initialize video info request: ' + (error.message || 'Unknown error')));
         }
     });
 }
@@ -449,27 +463,44 @@ app.post('/api/validate', async (req, res) => {
 
         try {
             const testUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            const isValid = ytdl.validateURL(testUrl);
+            
+            // First check URL validity
+            let isValid = false;
+            try {
+                isValid = ytdl.validateURL(testUrl);
+            } catch (validateError) {
+                console.warn('⚠️ URL validation failed:', validateError);
+                accessError = 'Invalid YouTube URL format';
+            }
 
             if (isValid) {
-                await ytdl.getBasicInfo(testUrl, {
-                    requestOptions: {
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                try {
+                    await ytdl.getBasicInfo(testUrl, {
+                        requestOptions: {
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                            }
                         }
+                    });
+                    canAccess = true;
+                } catch (basicInfoError) {
+                    console.warn('⚠️ Basic info fetch failed:', basicInfoError);
+                    if (basicInfoError && basicInfoError.message) {
+                        if (basicInfoError.message.includes('Video unavailable')) {
+                            accessError = 'Video is unavailable, private, or deleted';
+                        } else if (basicInfoError.message.includes('Sign in')) {
+                            accessError = 'Age-restricted video - cannot process';
+                        } else {
+                            accessError = 'Video may not be accessible: ' + basicInfoError.message;
+                        }
+                    } else {
+                        accessError = 'Video may not be accessible (unknown error)';
                     }
-                });
-                canAccess = true;
+                }
             }
         } catch (testError) {
-            console.warn('⚠️ Video access test failed:', testError.message);
-            if (testError.message.includes('Video unavailable')) {
-                accessError = 'Video is unavailable, private, or deleted';
-            } else if (testError.message.includes('Sign in')) {
-                accessError = 'Age-restricted video - cannot process';
-            } else {
-                accessError = 'Video may not be accessible';
-            }
+            console.warn('⚠️ Video access test failed:', testError);
+            accessError = 'Failed to test video accessibility: ' + (testError.message || 'Unknown error');
         }
 
         res.json({
@@ -484,7 +515,7 @@ app.post('/api/validate', async (req, res) => {
         console.error('❌ Validation error:', error);
         res.status(500).json({
             success: false,
-            error: 'Validation failed: ' + error.message
+            error: 'Validation failed: ' + (error.message || 'Unknown error')
         });
     }
 });
@@ -496,29 +527,42 @@ app.get('/api/info/:videoId', async (req, res) => {
 
         if (!videoId || videoId.length !== 11) {
             return res.status(400).json({ 
+                success: false,
                 error: 'Invalid video ID format' 
             });
         }
 
+        console.log('📄 Getting info for video ID:', videoId);
         const info = await getVideoInfo(videoId);
+        
         res.json({
             success: true,
             ...info
         });
 
     } catch (error) {
-        console.error('❌ Video info error:', error);
+        console.error('❌ Video info error for ID:', req.params.videoId, 'Error:', error);
 
         let statusCode = 500;
-        if (error.message.includes('unavailable') || error.message.includes('private')) {
-            statusCode = 404;
-        } else if (error.message.includes('too long') || error.message.includes('too short')) {
-            statusCode = 400;
+        let errorMessage = 'Failed to get video information';
+
+        if (error && error.message) {
+            errorMessage = error.message;
+            if (error.message.includes('unavailable') || error.message.includes('private')) {
+                statusCode = 404;
+            } else if (error.message.includes('too long') || error.message.includes('too short')) {
+                statusCode = 400;
+            } else if (error.message.includes('timeout')) {
+                statusCode = 408;
+            }
+        } else {
+            console.error('❌ Empty error object received');
+            errorMessage = 'Unknown error occurred while getting video information';
         }
 
         res.status(statusCode).json({ 
             success: false,
-            error: error.message 
+            error: errorMessage
         });
     }
 });

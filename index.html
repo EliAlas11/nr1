@@ -737,38 +737,48 @@
                 const response = await fetch(`${API_BASE_URL}/info/${videoId}`);
                 console.log('📄 Video info response status:', response.status);
                 
-                const info = await response.json();
-                console.log('📄 Video info data:', info);
+                let info;
+                try {
+                    info = await response.json();
+                    console.log('📄 Video info data:', info);
+                } catch (parseError) {
+                    console.error('📄 Failed to parse response JSON:', parseError);
+                    throw new Error('Invalid response from server');
+                }
 
-                if (response.ok && info.success) {
+                if (response.ok && info && info.success) {
                     const minutes = Math.floor(info.duration / 60);
                     const seconds = (info.duration % 60).toString().padStart(2, '0');
 
                     videoInfoDiv.innerHTML = `
                         <h3><i class="fas fa-info-circle"></i> Video Information</h3>
-                        <p><strong>Title:</strong> ${info.title}</p>
-                        <p><strong>Author:</strong> ${info.author}</p>
+                        <p><strong>Title:</strong> ${info.title || 'Unknown Title'}</p>
+                        <p><strong>Author:</strong> ${info.author || 'Unknown Author'}</p>
                         <p><strong>Duration:</strong> ${minutes}:${seconds}</p>
-                        <p><strong>Views:</strong> ${parseInt(info.viewCount).toLocaleString()}</p>
+                        <p><strong>Views:</strong> ${parseInt(info.viewCount || 0).toLocaleString()}</p>
                         <div style="margin-top: 15px; padding: 10px; background: rgba(79, 172, 254, 0.1); border-radius: 8px; color: #4facfe;">
                             <i class="fas fa-check"></i> Video is ready for processing!
                         </div>
                     `;
                 } else {
-                    throw new Error(info.error || `Failed to get video information (Status: ${response.status})`);
+                    const errorMessage = (info && info.error) || `Failed to get video information (Status: ${response.status})`;
+                    throw new Error(errorMessage);
                 }
             } catch (error) {
                 console.error('Video info error:', error);
+                const errorMessage = error.message || 'Unknown error occurred';
+                
                 videoInfoDiv.innerHTML = `
                     <h3><i class="fas fa-exclamation-triangle"></i> Video Information Error</h3>
                     <div style="color: #fd746c; padding: 15px; background: rgba(253, 116, 108, 0.1); border-radius: 8px;">
-                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p><strong>Error:</strong> ${errorMessage}</p>
                         <div style="margin-top: 10px; font-size: 0.9rem;">
                             <strong>Common causes:</strong><br>
                             • Video is private or deleted<br>
                             • Age-restricted content<br>
                             • Regional restrictions<br>
-                            • Invalid YouTube URL
+                            • Invalid YouTube URL<br>
+                            • Server connectivity issues
                         </div>
                     </div>
                 `;
@@ -849,13 +859,23 @@
                 });
 
                 console.log('📥 Process response status:', response.status);
-                const data = await response.json();
-                console.log('📥 Process response data:', data);
+                
+                let data;
+                try {
+                    data = await response.json();
+                    console.log('📥 Process response data:', data);
+                } catch (parseError) {
+                    clearInterval(progressInterval);
+                    console.error('📥 Failed to parse process response:', parseError);
+                    throw new Error('Invalid response from server during processing');
+                }
 
                 clearInterval(progressInterval);
 
-                if (!response.ok || !data.success) {
-                    throw new Error(data.error || `Processing failed (Status: ${response.status})`);
+                if (!response.ok || !data || !data.success) {
+                    const errorMessage = (data && data.error) || `Processing failed (Status: ${response.status})`;
+                    console.error('📥 Processing failed:', errorMessage);
+                    throw new Error(errorMessage);
                 }
 
                 updateProgress(100, 'Complete!');
@@ -867,8 +887,10 @@
             } catch (error) {
                 console.error('❌ Processing error:', error);
                 updateProgress(0);
-                showError(error.message);
-                showNotification(error.message, 'error');
+                
+                const errorMessage = error.message || 'Unknown error occurred during processing';
+                showError(errorMessage);
+                showNotification(errorMessage, 'error');
             } finally {
                 setLoadingState(false);
             }
