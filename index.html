@@ -393,6 +393,21 @@
             background: #1a3d1a;
         }
 
+        .info {
+            color: #3b82f6;
+            font-weight: 600;
+            margin-top: 10px;
+            background: #eff6ff;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border-left: 4px solid #3b82f6;
+        }
+
+        body.dark-mode .info {
+            background: #1e3a8a;
+            color: #93c5fd;
+        }
+
         .platform-icons {
             display: flex;
             justify-content: center;
@@ -969,12 +984,15 @@
                     <small>
                         <strong>Tips:</strong><br>
                         • Make sure the YouTube URL is correct and public<br>
-                        • Videos longer than 30 minutes are not supported<br>
-                        • Age-restricted or private videos cannot be processed
+                        • Videos should be between 10 seconds and 30 minutes<br>
+                        • Age-restricted, private, or live videos cannot be processed<br>
+                        • Try using a different video if the issue persists<br>
+                        • Check that the video has both audio and video
                     </small>
                 </div>
             `;
             resultDiv.style.display = 'block';
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
         }
 
         // Loading state management
@@ -999,19 +1017,30 @@
         async function showExamples() {
             setLoadingState(true);
             document.getElementById('loader').style.display = 'block';
+            updateProgress(20, 'Generating example...');
 
             try {
-                const videoUrl = window.location.origin + '/api/videos/sample';
+                // First check if sample video is available
+                const checkResponse = await fetch('/api/videos/sample', { method: 'HEAD' });
+                
+                let videoUrl = window.location.origin + '/api/videos/sample';
+                let generatingMessage = '';
+                
+                if (!checkResponse.ok) {
+                    generatingMessage = '<div class="info">⏳ Generating example video... This may take a moment.</div>';
+                    updateProgress(50, 'Creating sample video...');
+                }
 
                 const resultDiv = document.getElementById('result');
                 resultDiv.innerHTML = `
                     <h2><i class="fas fa-lightbulb"></i> Example Viral Clip</h2>
                     <p>This is what your viral clips will look like!</p>
+                    ${generatingMessage}
 
                     <div class="video-container">
-                        <video controls preload="metadata" playsinline>
+                        <video controls preload="metadata" playsinline id="exampleVideo">
                             <source src="${videoUrl}" type="video/mp4">
-                            <p>Your browser does not support video playback.</p>
+                            <p>Your browser does not support video playback. <a href="${videoUrl}" download>Download the video instead</a>.</p>
                         </video>
                     </div>
 
@@ -1025,15 +1054,34 @@
                     </div>
 
                     <div class="success">
-                        <i class="fas fa-star"></i> This example shows the vertical format and quality you can expect!
+                        <i class="fas fa-star"></i> This example shows the vertical format (9:16) and quality you can expect!
+                        <br><small>Perfect for TikTok, Instagram Reels, and YouTube Shorts</small>
                     </div>
                 `;
 
                 resultDiv.style.display = 'block';
                 resultDiv.scrollIntoView({ behavior: 'smooth' });
+                
+                updateProgress(80, 'Loading video...');
+
+                // Handle video loading
+                const video = document.getElementById('exampleVideo');
+                video.addEventListener('loadeddata', function() {
+                    console.log('Example video loaded successfully');
+                    updateProgress(100, 'Complete!');
+                    setTimeout(() => updateProgress(0), 2000);
+                });
+                
+                video.addEventListener('error', function(e) {
+                    console.error('Example video error:', e);
+                    showError('Example video is being generated. Please try again in a moment.');
+                    updateProgress(0);
+                });
 
             } catch (error) {
-                showError('Failed to load example video. Please try again.');
+                console.error('Example loading error:', error);
+                showError('Failed to load example video. Please try again in a moment.');
+                updateProgress(0);
             } finally {
                 setLoadingState(false);
                 document.getElementById('loader').style.display = 'none';
