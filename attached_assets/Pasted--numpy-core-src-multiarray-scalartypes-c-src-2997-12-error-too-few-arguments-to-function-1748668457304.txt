@@ -1,0 +1,152 @@
+           numpy/core/src/multiarray/scalartypes.c.src:2997:12: error: too few arguments to function ‘_Py_HashDouble’
+             2997 |     return _Py_HashDouble(npy_half_to_double(PyArrayScalar_VAL(obj, Half)));
+                  |            ^~~~~~~~~~~~~~
+            /usr/local/include/python3.11/pyhash.h:10:23: note: declared here
+               10 | PyAPI_FUNC(Py_hash_t) _Py_HashDouble(PyObject *, double);
+                  |                       ^~~~~~~~~~~~~~
+            gcc: numpy/core/src/multiarray/typeinfo.c
+            numpy/core/src/multiarray/scalartypes.c.src: In function ‘longdouble_arrtype_hash’:
+            numpy/core/src/multiarray/scalartypes.c.src:2968:1: warning: control reaches end of non-void function [-Wreturn-type]
+             2968 | }
+                  | ^
+            numpy/core/src/multiarray/scalartypes.c.src: In function ‘float_arrtype_hash’:
+            numpy/core/src/multiarray/scalartypes.c.src:2968:1: warning: control reaches end of non-void function [-Wreturn-type]
+             2968 | }
+                  | ^
+            numpy/core/src/multiarray/scalartypes.c.src: In function ‘half_arrtype_hash’:
+            numpy/core/src/multiarray/scalartypes.c.src:2998:1: warning: control reaches end of non-void function [-Wreturn-type]
+             2998 | }
+                  | ^
+            gcc: numpy/core/src/multiarray/vdot.c
+            gcc: numpy/core/src/multiarray/usertypes.c
+            gcc: numpy/core/src/umath/umathmodule.c
+            gcc: numpy/core/src/multiarray/nditer_pywrap.c
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/umath/loops.c
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/multiarray/nditer_templ.c
+            gcc: numpy/core/src/umath/reduction.c
+            gcc: numpy/core/src/umath/ufunc_object.c
+            gcc: numpy/core/src/umath/ufunc_type_resolution.c
+            gcc: numpy/core/src/multiarray/number.c
+            gcc: numpy/core/src/multiarray/nditer_api.c
+            gcc: numpy/core/src/umath/override.c
+            gcc: numpy/core/src/npymath/npy_math.c
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/npymath/ieee754.c
+            gcc: numpy/core/src/multiarray/flagsobject.c
+            numpy/core/src/multiarray/nditer_api.c: In function ‘npyiter_coalesce_axes’:
+            numpy/core/src/multiarray/nditer_api.c:1684:24: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+             1684 |             perm[idim] = (npy_int8)idim;
+                  |             ~~~~~~~~~~~^~~~~~~~~~~~~~~~
+            In file included from numpy/core/src/multiarray/nditer_api.c:16:
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset 1 into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:1684:24: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+             1684 |             perm[idim] = (npy_int8)idim;
+                  |             ~~~~~~~~~~~^~~~~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset [2, 253] into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:1684:24: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+             1684 |             perm[idim] = (npy_int8)idim;
+                  |             ~~~~~~~~~~~^~~~~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset [3, 253] into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:1684:24: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+             1684 |             perm[idim] = (npy_int8)idim;
+                  |             ~~~~~~~~~~~^~~~~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset [4, 253] into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:1684:24: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+             1684 |             perm[idim] = (npy_int8)idim;
+                  |             ~~~~~~~~~~~^~~~~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset [5, 253] into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:1684:24: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+             1684 |             perm[idim] = (npy_int8)idim;
+                  |             ~~~~~~~~~~~^~~~~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset [6, 253] into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/npymath/npy_math_complex.c
+            gcc: numpy/core/src/common/array_assign.c
+            gcc: numpy/core/src/npymath/halffloat.c
+            gcc: numpy/core/src/multiarray/getset.c
+            numpy/core/src/multiarray/nditer_api.c: In function ‘NpyIter_RemoveAxis’:
+            numpy/core/src/multiarray/nditer_api.c:123:20: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+              123 |         perm[idim] = p;
+                  |         ~~~~~~~~~~~^~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset 1 into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:123:20: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+              123 |         perm[idim] = p;
+                  |         ~~~~~~~~~~~^~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset 1 into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:123:20: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+              123 |         perm[idim] = p;
+                  |         ~~~~~~~~~~~^~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset 1 into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:123:20: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+              123 |         perm[idim] = p;
+                  |         ~~~~~~~~~~~^~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset 1 into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:123:20: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+              123 |         perm[idim] = p;
+                  |         ~~~~~~~~~~~^~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset 1 into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            numpy/core/src/multiarray/nditer_api.c:123:20: warning: writing 1 byte into a region of size 0 [-Wstringop-overflow=]
+              123 |         perm[idim] = p;
+                  |         ~~~~~~~~~~~^~~
+            numpy/core/src/multiarray/nditer_impl.h:148:10: note: at offset 1 into destination object ‘iter_flexdata’ of size 1
+              148 |     char iter_flexdata;
+                  |          ^~~~~~~~~~~~~
+            gcc: numpy/core/src/common/mem_overlap.c
+            gcc: numpy/core/src/common/ucsnarrow.c
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/common/npy_cpu_features.c
+            gcc: numpy/core/src/umath/extobj.c
+            gcc: numpy/core/src/common/ufunc_override.c
+            gcc: numpy/core/src/common/numpyos.c
+            gcc: numpy/core/src/common/cblasfuncs.c
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/umath/scalarmath.c
+            gcc: numpy/core/src/common/npy_longdouble.c
+            gcc: numpy/core/src/common/python_xerbla.c
+            gcc: numpy/core/src/multiarray/mapping.c
+            gcc: numpy/core/src/multiarray/methods.c
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/umath/matmul.c
+            gcc: build/src.linux-x86_64-3.11/numpy/core/src/umath/clip.c
+            error: Command "gcc -Wsign-compare -DNDEBUG -g -fwrapv -O3 -Wall -fPIC -DNPY_INTERNAL_BUILD=1 -DHAVE_NPY_CONFIG_H=1 -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE=1 -D_LARGEFILE64_SOURCE=1 -DNO_ATLAS_INFO=1 -DHAVE_CBLAS -I/usr/local/include -I/usr/include -I/opt/render/project/src/.venv/include -Ibuild/src.linux-x86_64-3.11/numpy/core/src/umath -Ibuild/src.linux-x86_64-3.11/numpy/core/src/npymath -Ibuild/src.linux-x86_64-3.11/numpy/core/src/common -Inumpy/core/include -Ibuild/src.linux-x86_64-3.11/numpy/core/include/numpy -Inumpy/core/src/common -Inumpy/core/src -Inumpy/core -Inumpy/core/src/npymath -Inumpy/core/src/multiarray -Inumpy/core/src/umath -Inumpy/core/src/npysort -I/opt/render/project/src/.venv/include -I/usr/local/include/python3.11 -Ibuild/src.linux-x86_64-3.11/numpy/core/src/common -Ibuild/src.linux-x86_64-3.11/numpy/core/src/npymath -c build/src.linux-x86_64-3.11/numpy/core/src/multiarray/scalartypes.c -o build/temp.linux-x86_64-3.11/build/src.linux-x86_64-3.11/numpy/core/src/multiarray/scalartypes.o -MMD -MF build/temp.linux-x86_64-3.11/build/src.linux-x86_64-3.11/numpy/core/src/multiarray/scalartypes.o.d -std=c99" failed with exit status 1
+            [end of output]
+      
+        note: This error originates from a subprocess, and is likely not a problem with pip.
+        ERROR: Failed building wheel for numpy
+      Failed to build numpy
+      ERROR: Could not build wheels for numpy, which is required to install pyproject.toml-based projects
+      
+      [notice] A new release of pip is available: 24.0 -> 25.1.1
+      [notice] To update, run: pip install --upgrade pip
+      [end of output]
+  
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: subprocess-exited-with-error
+× pip subprocess to install build dependencies did not run successfully.
+│ exit code: 1
+╰─> See above for output.
+note: This error originates from a subprocess, and is likely not a problem with pip.
+[notice] A new release of pip is available: 24.0 -> 25.1.1
+[notice] To update, run: pip install --upgrade pip
+==> Build failed 😞
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Requesting Node.js version >=14.0.0
+==> Using Node.js version 24.1.0 via /opt/render/project/src/package.json
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
