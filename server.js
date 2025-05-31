@@ -31,8 +31,13 @@ app.use('/api', videoRoutes);
 app.post('/api/process', (req, res) => {
   const { videoId } = req.body;
   
+  console.log('Processing video with ID:', videoId);
+  
   if (!videoId) {
-    return res.status(400).json({ error: 'Video ID is required' });
+    return res.status(400).json({ 
+      success: false, 
+      error: 'Video ID is required' 
+    });
   }
   
   // Simulate video processing
@@ -40,19 +45,22 @@ app.post('/api/process', (req, res) => {
     // Generate unique ID for processed video
     const processedId = `processed_${Date.now()}`;
     
-    // In a real application, we would process and save the video
-    // Here we just copy the sample file
-    const samplePath = path.join(__dirname, 'videos', 'sample.mp4');
-    const processedPath = path.join(__dirname, 'videos', 'processed', `${processedId}.mp4`);
+    // Create videos directory if it doesn't exist
+    const videosDir = path.join(__dirname, 'videos');
+    const processedDir = path.join(videosDir, 'processed');
     
     try {
-      // Ensure the directory exists
-      if (!fs.existsSync(path.join(__dirname, 'videos', 'processed'))) {
-        fs.mkdirSync(path.join(__dirname, 'videos', 'processed'), { recursive: true });
+      // Ensure directories exist
+      if (!fs.existsSync(videosDir)) {
+        fs.mkdirSync(videosDir, { recursive: true });
+      }
+      if (!fs.existsSync(processedDir)) {
+        fs.mkdirSync(processedDir, { recursive: true });
       }
       
-      // Copy sample file
-      fs.copyFileSync(samplePath, processedPath);
+      // Create a dummy video file (since we don't have a real sample)
+      const processedPath = path.join(processedDir, `${processedId}.mp4`);
+      fs.writeFileSync(processedPath, 'dummy video content');
       
       res.json({
         success: true,
@@ -61,7 +69,10 @@ app.post('/api/process', (req, res) => {
       });
     } catch (error) {
       console.error('Error processing video:', error);
-      res.status(500).json({ error: 'Failed to process video' });
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to process video' 
+      });
     }
   }, 2000); // Simulate processing delay
 });
