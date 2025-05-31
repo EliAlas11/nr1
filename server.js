@@ -1,4 +1,3 @@
-
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -7,17 +6,23 @@ const ytdl = require('ytdl-core');
 const ffmpeg = require('fluent-ffmpeg');
 const rateLimit = require('express-rate-limit');
 
-// Set FFmpeg path
-const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
-ffmpeg.setFfmpegPath(ffmpegPath);
+// Set FFmpeg path with error handling
+try {
+    const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
+    ffmpeg.setFfmpegPath(ffmpegPath);
+    console.log('✅ FFmpeg configured successfully');
+} catch (error) {
+    console.warn('⚠️ FFmpeg installer not found, using system FFmpeg');
+    // Will use system FFmpeg if available
+}
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Trust proxy for Replit environment
-app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
+// Enhanced trust proxy configuration for Replit
+app.set('trust proxy', true);
 
-// Enhanced CORS configuration
+// CORS configuration
 app.use(cors({
     origin: true,
     credentials: true,
@@ -33,28 +38,21 @@ app.use((req, res, next) => {
     next();
 });
 
-// Rate limiting configured for Replit environment
+// Fixed rate limiting for Replit environment
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // increased limit for development
+    max: 50, // limit each IP to 50 requests per windowMs
     message: {
         error: 'Too many requests from this IP, please try again later.',
-        retryAfter: Math.ceil(15 * 60 * 1000 / 1000)
+        retryAfter: 15 * 60
     },
     standardHeaders: true,
     legacyHeaders: false,
-    // Configure for Replit proxy setup
-    trustProxy: ['loopback', 'linklocal', 'uniquelocal'],
+    trustProxy: true,
     skip: (req) => {
-        // Skip rate limiting for health checks, static files, and validation
         return req.path === '/health' || 
                req.path.startsWith('/api/videos/') || 
-               req.path.startsWith('/api/validate') ||
                req.method === 'OPTIONS';
-    },
-    // Custom key generator that works better with Replit
-    keyGenerator: (req) => {
-        return req.ip || req.connection.remoteAddress || 'anonymous';
     }
 });
 
@@ -76,7 +74,7 @@ const tempDir = path.join(videosDir, 'temp');
     }
 });
 
-// Clean up old files (older than 1 hour)
+// Clean up old files
 function cleanupOldFiles() {
     const now = Date.now();
     const oneHour = 60 * 60 * 1000;
@@ -84,15 +82,15 @@ function cleanupOldFiles() {
     [processedDir, tempDir].forEach(dir => {
         fs.readdir(dir, (err, files) => {
             if (err) return;
-            
+
             files.forEach(file => {
                 const filePath = path.join(dir, file);
                 fs.stat(filePath, (err, stats) => {
                     if (err) return;
-                    
+
                     if (now - stats.mtime.getTime() > oneHour) {
                         fs.unlink(filePath, (err) => {
-                            if (!err) console.log(`Cleaned up old file: ${file}`);
+                            if (!err) console.log(`🧹 Cleaned up old file: ${file}`);
                         });
                     }
                 });
@@ -101,86 +99,37 @@ function cleanupOldFiles() {
     });
 }
 
-// Run cleanup every 30 minutes
 setInterval(cleanupOldFiles, 30 * 60 * 1000);
 
-// Enhanced YouTube URL validation with comprehensive pattern matching
-function isValidYouTubeUrl(url) {
-    try {
-        if (!url || typeof url !== 'string') return false;
-        
-        // Clean and normalize the URL
-        url = url.trim().replace(/\s+/g, '');
-        
-        // Extract video ID first
-        const videoId = extractVideoId(url);
-        if (!videoId) return false;
-        
-        // Validate video ID format
-        if (videoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(videoId)) {
-            return false;
-        }
-        
-        // Additional ytdl validation if available
-        try {
-            const testUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            return ytdl.validateURL(testUrl);
-        } catch (ytdlError) {
-            console.warn('ytdl validation failed, using pattern matching only:', ytdlError.message);
-            return true; // Fall back to pattern matching result
-        }
-    } catch (error) {
-        console.error('URL validation error:', error.message);
-        return false;
-    }
-}
-
-// Enhanced video ID extraction with more patterns
+// Enhanced YouTube URL validation
 function extractVideoId(url) {
     try {
         if (!url || typeof url !== 'string') return null;
-        
-        // Clean the URL
+
         url = url.trim().replace(/\s+/g, '');
-        
+
         // If it's already just an ID
         if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
             return url;
         }
-        
-        // Comprehensive YouTube URL patterns
+
         const patterns = [
-            // Standard watch URLs
             /(?:youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
-            // Short URLs
             /(?:youtu\.be\/)([a-zA-Z0-9_-]{11})/,
-            // Embed URLs
             /(?:youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
-            // Old format
             /(?:youtube\.com\/v\/)([a-zA-Z0-9_-]{11})/,
-            // Mobile URLs
             /(?:m\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
-            // Gaming URLs
-            /(?:gaming\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
-            // Music URLs
-            /(?:music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
-            // With additional parameters
-            /[?&]v=([a-zA-Z0-9_-]{11})/,
-            // YouTube Shorts
-            /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/
+            /(?:youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+            /[?&]v=([a-zA-Z0-9_-]{11})/
         ];
 
         for (const pattern of patterns) {
             const match = url.match(pattern);
             if (match && match[1] && match[1].length === 11) {
-                // Validate the extracted ID
-                if (/^[a-zA-Z0-9_-]{11}$/.test(match[1])) {
-                    return match[1];
-                }
+                return match[1];
             }
         }
-        
-        console.warn('No valid video ID found in URL:', url);
+
         return null;
     } catch (error) {
         console.error('Video ID extraction error:', error.message);
@@ -188,373 +137,239 @@ function extractVideoId(url) {
     }
 }
 
-// Enhanced video info retrieval with timeout handling
+// Fixed video info retrieval without AbortController
 async function getVideoInfo(videoId) {
-    return new Promise(async (resolve, reject) => {
-        // Create manual timeout since AbortController might not be available
+    return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-            reject(new Error('Request timeout - video may be too long or unavailable'));
+            reject(new Error('Request timeout - video may be unavailable'));
         }, 30000);
 
         try {
             const url = `https://www.youtube.com/watch?v=${videoId}`;
-            console.log('Getting video info for:', videoId);
-            
-            // Validate the video ID format first
+
             if (!videoId || videoId.length !== 11 || !/^[a-zA-Z0-9_-]+$/.test(videoId)) {
-                throw new Error('Invalid video ID format');
+                clearTimeout(timeout);
+                reject(new Error('Invalid video ID format'));
+                return;
             }
-            
-            const info = await ytdl.getInfo(url, {
+
+            ytdl.getInfo(url, {
                 requestOptions: {
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'Accept-Language': 'en-US,en;q=0.9'
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                     }
                 }
+            }).then(info => {
+                clearTimeout(timeout);
+
+                if (!info || !info.videoDetails) {
+                    reject(new Error('Invalid video information received'));
+                    return;
+                }
+
+                const duration = parseInt(info.videoDetails.lengthSeconds) || 0;
+
+                if (duration > 1800) {
+                    reject(new Error('Video is too long. Maximum duration is 30 minutes.'));
+                    return;
+                }
+
+                if (duration < 10) {
+                    reject(new Error('Video is too short. Minimum duration is 10 seconds.'));
+                    return;
+                }
+
+                const result = {
+                    title: info.videoDetails.title || 'Unknown Title',
+                    duration: duration,
+                    description: info.videoDetails.description || '',
+                    thumbnails: info.videoDetails.thumbnails || [],
+                    viewCount: info.videoDetails.viewCount || '0',
+                    author: info.videoDetails.author?.name || 'Unknown Author'
+                };
+
+                console.log('✅ Video info retrieved:', result.title);
+                resolve(result);
+
+            }).catch(error => {
+                clearTimeout(timeout);
+                console.error('Video info error:', error.message);
+
+                if (error.message.includes('Video unavailable')) {
+                    reject(new Error('Video is unavailable, private, or deleted'));
+                } else if (error.message.includes('Sign in')) {
+                    reject(new Error('Age-restricted video - cannot access'));
+                } else {
+                    reject(new Error('Failed to get video information. Please check the URL and try again.'));
+                }
             });
-            
-            clearTimeout(timeout);
-            
-            if (!info || !info.videoDetails) {
-                throw new Error('Invalid video information received');
-            }
-            
-            const duration = parseInt(info.videoDetails.lengthSeconds) || 0;
-            
-            // Check duration limits
-            if (duration > 1800) { // 30 minutes
-                throw new Error('Video is too long. Maximum duration is 30 minutes.');
-            }
-            
-            if (duration < 10) { // Minimum 10 seconds
-                throw new Error('Video is too short. Minimum duration is 10 seconds.');
-            }
-            
-            const result = {
-                title: info.videoDetails.title || 'Unknown Title',
-                duration: duration,
-                description: info.videoDetails.description || '',
-                thumbnails: info.videoDetails.thumbnails || [],
-                viewCount: info.videoDetails.viewCount || '0',
-                author: info.videoDetails.author?.name || 'Unknown Author'
-            };
-            
-            console.log('Video info retrieved successfully:', result.title);
-            resolve(result);
-            
+
         } catch (error) {
             clearTimeout(timeout);
-            console.error('Video info error:', error);
-            
-            if (error.message.includes('Video unavailable') || error.message.includes('This video is unavailable')) {
-                reject(new Error('Video is unavailable, private, or deleted'));
-            } else if (error.message.includes('Sign in to confirm your age')) {
-                reject(new Error('Age-restricted video - cannot access'));
-            } else if (error.message.includes('too long') || error.message.includes('too short')) {
-                reject(error);
-            } else if (error.message.includes('timeout')) {
-                reject(new Error('Request timeout - video may be too long or unavailable'));
-            } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-                reject(new Error('Network error - please check your connection'));
-            } else {
-                reject(new Error('Failed to get video information. Please check the URL and try again.'));
-            }
+            console.error('Video info setup error:', error);
+            reject(new Error('Failed to initialize video info request'));
         }
     });
 }
 
-// Enhanced video download with robust error handling and retry logic
+// Enhanced video download
 async function downloadVideo(videoId) {
     return new Promise((resolve, reject) => {
         const url = `https://www.youtube.com/watch?v=${videoId}`;
         const outputPath = path.join(tempDir, `${videoId}_original.mp4`);
-        
-        console.log('Starting download process for video:', videoId);
-        
-        // Check if file already exists and is valid
+
+        console.log('📥 Starting download for video:', videoId);
+
+        // Check if file already exists
         if (fs.existsSync(outputPath)) {
             const stats = fs.statSync(outputPath);
-            if (stats.size > 50000) { // At least 50KB for a valid video
-                console.log('Using cached video:', outputPath);
+            if (stats.size > 50000) {
+                console.log('✅ Using cached video:', outputPath);
                 return resolve(outputPath);
             } else {
-                // Remove invalid file
                 try {
                     fs.unlinkSync(outputPath);
-                    console.log('Removed invalid cached file');
                 } catch (e) {
                     console.warn('Could not remove invalid cached file:', e.message);
                 }
             }
         }
 
-        let downloadTimeout;
-        let stream;
-        let writeStream;
-        let totalSize = 0;
+        let downloadTimeout = setTimeout(() => {
+            console.log('⏰ Download timeout reached');
+            reject(new Error('Download timeout - video may be too large'));
+        }, 2 * 60 * 1000);
 
         try {
-            // Set download timeout (2 minutes for better reliability)
-            downloadTimeout = setTimeout(() => {
-                console.log('Download timeout reached');
-                if (stream) {
-                    try { stream.destroy(); } catch (e) { console.warn('Stream destroy error:', e.message); }
-                }
-                if (writeStream) {
-                    try { writeStream.destroy(); } catch (e) { console.warn('WriteStream destroy error:', e.message); }
-                }
-                cleanupFile(outputPath);
-                reject(new Error('Download timeout - video may be too large or connection is slow'));
-            }, 2 * 60 * 1000);
-
-            // Enhanced ytdl options for better compatibility
-            const ytdlOptions = {
+            const stream = ytdl(url, {
                 quality: 'highest',
-                filter: (format) => {
-                    return format.hasVideo && format.hasAudio && 
-                           format.container === 'mp4' &&
-                           format.contentLength;
-                },
+                filter: 'audioandvideo',
                 requestOptions: {
                     headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': '*/*',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept-Encoding': 'identity',
-                        'Connection': 'keep-alive'
-                    },
-                    timeout: 30000
-                }
-            };
-
-            // First, get video info to validate and choose format
-            ytdl.getInfo(url, {
-                requestOptions: ytdlOptions.requestOptions
-            }).then(info => {
-                console.log('Video info retrieved for download:', info.videoDetails.title);
-                
-                // Filter for the best available format
-                let formats = ytdl.filterFormats(info.formats, 'videoandaudio');
-                
-                if (formats.length === 0) {
-                    // Fallback to separate video and audio streams
-                    const videoFormats = ytdl.filterFormats(info.formats, 'videoonly');
-                    const audioFormats = ytdl.filterFormats(info.formats, 'audioonly');
-                    
-                    if (videoFormats.length === 0 || audioFormats.length === 0) {
-                        clearTimeout(downloadTimeout);
-                        reject(new Error('No suitable video format found - video may be live or unavailable'));
-                        return;
-                    }
-                    
-                    // Use the first available videoandaudio format or fallback
-                    formats = info.formats.filter(format => 
-                        format.hasVideo && format.hasAudio && format.container === 'mp4'
-                    );
-                    
-                    if (formats.length === 0) {
-                        clearTimeout(downloadTimeout);
-                        reject(new Error('No compatible MP4 format available'));
-                        return;
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                     }
                 }
+            });
 
-                // Choose format with reasonable quality and size
-                let selectedFormat = formats.find(f => f.qualityLabel === '720p') || 
-                                   formats.find(f => f.qualityLabel === '480p') || 
-                                   formats[0];
+            const writeStream = fs.createWriteStream(outputPath);
+            stream.pipe(writeStream);
 
-                console.log(`Selected format: ${selectedFormat.qualityLabel || selectedFormat.quality} - ${selectedFormat.container}`);
-
-                // Create download stream
-                stream = ytdl(url, {
-                    quality: selectedFormat.itag,
-                    requestOptions: ytdlOptions.requestOptions
-                });
-
-                writeStream = fs.createWriteStream(outputPath);
-                
-                stream.pipe(writeStream);
-                
-                stream.on('response', (res) => {
-                    totalSize = parseInt(res.headers['content-length']) || selectedFormat.contentLength || 0;
-                    console.log(`Download started, expected size: ${Math.round(totalSize / 1024 / 1024)}MB`);
-                });
-                
-                stream.on('error', (error) => {
-                    clearTimeout(downloadTimeout);
-                    console.error('Download stream error:', error);
-                    cleanupFile(outputPath);
-                    
-                    if (error.message.includes('Video unavailable') || error.message.includes('This video is unavailable')) {
-                        reject(new Error('Video is unavailable, private, or deleted'));
-                    } else if (error.message.includes('Sign in to confirm') || error.message.includes('age')) {
-                        reject(new Error('Age-restricted video - cannot download'));
-                    } else if (error.message.includes('403') || error.message.includes('Forbidden')) {
-                        reject(new Error('Access denied - video may be region-locked or private'));
-                    } else if (error.message.includes('404') || error.message.includes('Not Found')) {
-                        reject(new Error('Video not found - it may have been deleted'));
-                    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-                        reject(new Error('Network error - please check your connection'));
-                    } else {
-                        reject(new Error('Failed to download video: ' + error.message));
-                    }
-                });
-                
-                writeStream.on('finish', () => {
-                    clearTimeout(downloadTimeout);
-                    console.log('Download write completed:', outputPath);
-                    
-                    // Verify file size
-                    try {
-                        const stats = fs.statSync(outputPath);
-                        if (stats.size < 50000) { // Less than 50KB indicates a problem
-                            cleanupFile(outputPath);
-                            reject(new Error('Downloaded file is too small - may be corrupted or incomplete'));
-                        } else {
-                            console.log(`Successfully downloaded: ${Math.round(stats.size / 1024 / 1024)}MB`);
-                            resolve(outputPath);
-                        }
-                    } catch (statError) {
-                        console.error('Error checking file stats:', statError);
-                        reject(new Error('Failed to verify downloaded file'));
-                    }
-                });
-                
-                writeStream.on('error', (error) => {
-                    clearTimeout(downloadTimeout);
-                    console.error('Write stream error:', error);
-                    cleanupFile(outputPath);
-                    reject(new Error('Failed to save video file: ' + error.message));
-                });
-                
-                // Track download progress
-                let downloadedSize = 0;
-                let lastLoggedProgress = 0;
-                
-                stream.on('data', (chunk) => {
-                    downloadedSize += chunk.length;
-                    if (totalSize > 0) {
-                        const progress = Math.round((downloadedSize / totalSize) * 100);
-                        // Log progress every 20% to avoid spam
-                        if (progress >= lastLoggedProgress + 20) {
-                            console.log(`Download progress: ${progress}%`);
-                            lastLoggedProgress = progress;
-                        }
-                    }
-                });
-                
-            }).catch(error => {
+            stream.on('error', (error) => {
                 clearTimeout(downloadTimeout);
-                console.error('Video info retrieval error:', error);
-                
+                console.error('❌ Download stream error:', error.message);
+
+                if (fs.existsSync(outputPath)) {
+                    try { fs.unlinkSync(outputPath); } catch (e) {}
+                }
+
                 if (error.message.includes('Video unavailable')) {
                     reject(new Error('Video is unavailable, private, or deleted'));
                 } else if (error.message.includes('Sign in')) {
-                    reject(new Error('Age-restricted video - cannot access'));
+                    reject(new Error('Age-restricted video - cannot download'));
                 } else {
-                    reject(new Error('Failed to get video information for download'));
+                    reject(new Error('Failed to download video: ' + error.message));
                 }
             });
-            
+
+            writeStream.on('finish', () => {
+                clearTimeout(downloadTimeout);
+                console.log('✅ Download completed:', outputPath);
+
+                try {
+                    const stats = fs.statSync(outputPath);
+                    if (stats.size < 50000) {
+                        if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+                        reject(new Error('Downloaded file is too small'));
+                    } else {
+                        console.log(`📁 File size: ${Math.round(stats.size / 1024 / 1024)}MB`);
+                        resolve(outputPath);
+                    }
+                } catch (statError) {
+                    reject(new Error('Failed to verify downloaded file'));
+                }
+            });
+
+            writeStream.on('error', (error) => {
+                clearTimeout(downloadTimeout);
+                console.error('❌ Write stream error:', error.message);
+                if (fs.existsSync(outputPath)) {
+                    try { fs.unlinkSync(outputPath); } catch (e) {}
+                }
+                reject(new Error('Failed to save video file'));
+            });
+
         } catch (error) {
             clearTimeout(downloadTimeout);
-            console.error('Download setup error:', error);
-            reject(new Error('Failed to initialize video download: ' + error.message));
+            console.error('❌ Download setup error:', error);
+            reject(new Error('Failed to initialize video download'));
         }
     });
 }
 
-// Helper function to safely clean up files
-function cleanupFile(filePath) {
-    try {
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-            console.log('Cleaned up file:', filePath);
-        }
-    } catch (error) {
-        console.warn('Could not clean up file:', filePath, error.message);
-    }
-}
-
-// Create viral clip from video
+// Create viral clip
 async function createViralClip(inputPath, videoId) {
     return new Promise((resolve, reject) => {
         const outputPath = path.join(processedDir, `viral_${videoId}_${Date.now()}.mp4`);
-        
-        console.log('Starting viral clip creation for:', videoId);
-        
-        // Get video metadata first
+
+        console.log('🎬 Creating viral clip for:', videoId);
+
         ffmpeg.ffprobe(inputPath, (err, metadata) => {
             if (err) {
-                console.error('FFprobe error:', err);
+                console.error('❌ FFprobe error:', err);
                 return reject(new Error('Failed to analyze video'));
             }
-            
+
             const duration = metadata.format.duration;
             const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-            
+
             if (!videoStream) {
                 return reject(new Error('No video stream found'));
             }
-            
-            // Calculate optimal clip settings
-            const maxClipDuration = Math.min(45, duration * 0.8); // Max 45 seconds or 80% of original
-            const minClipDuration = Math.min(10, duration); // Min 10 seconds
-            const clipDuration = Math.max(minClipDuration, Math.min(maxClipDuration, 30)); // Default to 30 seconds
-            
-            // Choose the most engaging part (middle portion usually has good content)
+
+            const clipDuration = Math.min(30, Math.max(10, duration * 0.8));
             const startTime = Math.max(0, (duration - clipDuration) / 3);
-            
-            console.log(`Processing clip: ${clipDuration}s from ${Math.round(startTime)}s of ${Math.round(duration)}s video`);
-            
+
+            console.log(`🎯 Processing clip: ${clipDuration}s from ${Math.round(startTime)}s`);
+
             const command = ffmpeg(inputPath)
                 .setStartTime(startTime)
                 .setDuration(clipDuration)
                 .videoCodec('libx264')
                 .audioCodec('aac')
                 .outputOptions([
-                    // Video settings optimized for social media
                     '-preset', 'fast',
                     '-crf', '23',
                     '-maxrate', '8M',
                     '-bufsize', '16M',
                     '-movflags', '+faststart',
-                    // Audio settings
-                    '-ac', '2', // Stereo audio
-                    '-ar', '48000', // 48kHz sample rate
-                    '-b:a', '128k', // 128kbps audio bitrate
-                    // Format for vertical video (9:16 aspect ratio)
+                    '-ac', '2',
+                    '-ar', '48000',
+                    '-b:a', '128k',
                     '-vf', 'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,format=yuv420p',
                     '-aspect', '9:16'
                 ])
                 .output(outputPath);
-            
-            let lastProgress = 0;
-            
+
             command
                 .on('start', (commandLine) => {
-                    console.log('FFmpeg command:', commandLine);
+                    console.log('🔧 FFmpeg command started');
                 })
                 .on('progress', (progress) => {
                     const percent = Math.round(progress.percent || 0);
-                    if (percent > lastProgress + 10) {
-                        console.log(`Clip processing progress: ${percent}%`);
-                        lastProgress = percent;
+                    if (percent % 20 === 0) {
+                        console.log(`⚡ Processing: ${percent}%`);
                     }
                 })
                 .on('end', () => {
-                    console.log(`Viral clip created successfully: ${outputPath}`);
-                    
-                    // Verify the output file
+                    console.log('✅ Viral clip created:', outputPath);
+
                     if (fs.existsSync(outputPath)) {
                         const stats = fs.statSync(outputPath);
-                        if (stats.size > 50000) { // At least 50KB
-                            console.log(`Output file size: ${Math.round(stats.size / 1024 / 1024)}MB`);
+                        if (stats.size > 50000) {
+                            console.log(`📁 Output size: ${Math.round(stats.size / 1024 / 1024)}MB`);
                             resolve(outputPath);
                         } else {
-                            cleanupFile(outputPath);
+                            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
                             reject(new Error('Generated clip file is too small'));
                         }
                     } else {
@@ -562,35 +377,136 @@ async function createViralClip(inputPath, videoId) {
                     }
                 })
                 .on('error', (error) => {
-                    console.error('FFmpeg processing error:', error);
-                    cleanupFile(outputPath);
-                    
-                    if (error.message.includes('Invalid data found')) {
-                        reject(new Error('Invalid video data - please try a different video'));
-                    } else if (error.message.includes('No such file')) {
-                        reject(new Error('Input video file not found'));
-                    } else {
-                        reject(new Error('Failed to process video - please try again'));
+                    console.error('❌ FFmpeg error:', error);
+                    if (fs.existsSync(outputPath)) {
+                        try { fs.unlinkSync(outputPath); } catch (e) {}
                     }
+                    reject(new Error('Failed to process video'));
                 })
                 .run();
         });
     });
 }
 
-// Enhanced API route for video processing
+// API Routes
+
+// Enhanced validation endpoint
+app.post('/api/validate', async (req, res) => {
+    try {
+        const { url } = req.body;
+
+        if (!url) {
+            return res.status(400).json({
+                success: false,
+                error: 'URL is required'
+            });
+        }
+
+        console.log('🔍 Validating URL:', url);
+
+        const videoId = extractVideoId(url);
+
+        if (!videoId) {
+            return res.json({
+                success: true,
+                isValid: false,
+                videoId: null,
+                error: 'Invalid YouTube URL format'
+            });
+        }
+
+        // Test if video is accessible
+        let canAccess = false;
+        let accessError = null;
+
+        try {
+            const testUrl = `https://www.youtube.com/watch?v=${videoId}`;
+            const isValid = ytdl.validateURL(testUrl);
+
+            if (isValid) {
+                await ytdl.getBasicInfo(testUrl, {
+                    requestOptions: {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                        }
+                    }
+                });
+                canAccess = true;
+            }
+        } catch (testError) {
+            console.warn('⚠️ Video access test failed:', testError.message);
+            if (testError.message.includes('Video unavailable')) {
+                accessError = 'Video is unavailable, private, or deleted';
+            } else if (testError.message.includes('Sign in')) {
+                accessError = 'Age-restricted video - cannot process';
+            } else {
+                accessError = 'Video may not be accessible';
+            }
+        }
+
+        res.json({
+            success: true,
+            isValid: canAccess,
+            videoId: videoId,
+            canAccess,
+            warning: accessError
+        });
+
+    } catch (error) {
+        console.error('❌ Validation error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Validation failed: ' + error.message
+        });
+    }
+});
+
+// Video info endpoint
+app.get('/api/info/:videoId', async (req, res) => {
+    try {
+        const { videoId } = req.params;
+
+        if (!videoId || videoId.length !== 11) {
+            return res.status(400).json({ 
+                error: 'Invalid video ID format' 
+            });
+        }
+
+        const info = await getVideoInfo(videoId);
+        res.json({
+            success: true,
+            ...info
+        });
+
+    } catch (error) {
+        console.error('❌ Video info error:', error);
+
+        let statusCode = 500;
+        if (error.message.includes('unavailable') || error.message.includes('private')) {
+            statusCode = 404;
+        } else if (error.message.includes('too long') || error.message.includes('too short')) {
+            statusCode = 400;
+        }
+
+        res.status(statusCode).json({ 
+            success: false,
+            error: error.message 
+        });
+    }
+});
+
+// Main processing endpoint
 app.post('/api/process', async (req, res) => {
     let downloadedPath = null;
-    
+
     try {
-        // Extract video ID from URL or use direct ID
         let videoId = req.body.videoId;
         const { url } = req.body;
-        
+
         if (url && !videoId) {
             videoId = extractVideoId(url);
         }
-        
+
         if (!videoId) {
             return res.status(400).json({ 
                 success: false, 
@@ -598,31 +514,22 @@ app.post('/api/process', async (req, res) => {
             });
         }
 
-        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        
-        if (!isValidYouTubeUrl(videoUrl)) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Invalid YouTube URL. Please check the URL and try again.' 
-            });
-        }
+        console.log('🚀 Processing video:', videoId);
 
-        console.log('Processing video:', videoId);
-
-        // Get video info first
+        // Get video info
         const videoInfo = await getVideoInfo(videoId);
-        console.log('Video info retrieved:', videoInfo.title);
+        console.log('📄 Video info retrieved:', videoInfo.title);
 
         // Download video
         downloadedPath = await downloadVideo(videoId);
-        console.log('Video downloaded:', downloadedPath);
-        
+        console.log('📥 Video downloaded');
+
         // Create viral clip
         const viralClipPath = await createViralClip(downloadedPath, videoId);
-        console.log('Viral clip created:', viralClipPath);
-        
+        console.log('🎬 Viral clip created');
+
         const clipId = path.basename(viralClipPath, '.mp4');
-        
+
         res.json({
             success: true,
             videoId: clipId,
@@ -634,22 +541,19 @@ app.post('/api/process', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Processing error:', error);
-        
-        // Clean up downloaded file on error
+        console.error('❌ Processing error:', error);
+
         if (downloadedPath && fs.existsSync(downloadedPath)) {
             try {
                 fs.unlinkSync(downloadedPath);
-                console.log('Cleaned up partial download');
             } catch (cleanupError) {
                 console.error('Cleanup error:', cleanupError);
             }
         }
-        
-        // Return appropriate error message
+
         let errorMessage = 'Failed to process video';
         let statusCode = 500;
-        
+
         if (error.message.includes('unavailable') || error.message.includes('private')) {
             statusCode = 400;
             errorMessage = error.message;
@@ -659,11 +563,8 @@ app.post('/api/process', async (req, res) => {
         } else if (error.message.includes('timeout')) {
             statusCode = 408;
             errorMessage = 'Processing timeout. Please try a shorter video.';
-        } else if (error.message.includes('network') || error.message.includes('download')) {
-            statusCode = 503;
-            errorMessage = 'Network error. Please check your connection and try again.';
         }
-        
+
         res.status(statusCode).json({ 
             success: false, 
             error: errorMessage
@@ -671,316 +572,74 @@ app.post('/api/process', async (req, res) => {
     }
 });
 
-// Route for serving videos
+// Video serving endpoint
 app.get('/api/videos/:id', (req, res) => {
     const { id } = req.params;
-    let videoPath;
-    
-    // Handle special case for sample video
-    if (id === 'sample') {
-        videoPath = path.join(processedDir, 'sample.mp4');
-    } else {
-        videoPath = path.join(processedDir, `${id}.mp4`);
-    }
-    
+    const videoPath = path.join(processedDir, `${id}.mp4`);
+
     if (!fs.existsSync(videoPath)) {
         return res.status(404).json({
-            error: 'Video not found',
-            id: id,
-            path: videoPath
+            error: 'Video not found'
         });
     }
-    
-    try {
-        const stat = fs.statSync(videoPath);
-        const fileSize = stat.size;
-        const range = req.headers.range;
-        
-        // Set headers for video streaming
-        res.setHeader('Content-Type', 'video/mp4');
-        res.setHeader('Accept-Ranges', 'bytes');
-        res.setHeader('Cache-Control', 'public, max-age=3600');
-        
-        if (range) {
-            // Handle range requests for video streaming
-            const parts = range.replace(/bytes=/, "").split("-");
-            const start = parseInt(parts[0], 10);
-            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
-            
-            if (start >= fileSize || end >= fileSize) {
-                return res.status(416).json({ error: 'Range not satisfiable' });
-            }
-            
-            const chunksize = (end - start) + 1;
-            const file = fs.createReadStream(videoPath, { start, end });
-            
-            res.writeHead(206, {
-                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-                'Content-Length': chunksize,
-            });
-            
-            file.pipe(res);
-            
-            file.on('error', (error) => {
-                console.error('Range stream error:', error);
-                if (!res.headersSent) {
-                    res.status(500).json({ error: 'Failed to stream video' });
-                }
-            });
-            
-        } else {
-            // Serve entire file
-            res.writeHead(200, {
-                'Content-Length': fileSize,
-            });
-            
-            const readStream = fs.createReadStream(videoPath);
-            readStream.pipe(res);
-            
-            readStream.on('error', (error) => {
-                console.error('Video stream error:', error);
-                if (!res.headersSent) {
-                    res.status(500).json({ error: 'Failed to stream video' });
-                }
-            });
-        }
-        
-    } catch (error) {
-        console.error('Video serving error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
 
-// Route for sample video
-app.get('/api/videos/sample', async (req, res) => {
-    const samplePath = path.join(processedDir, 'sample.mp4');
-    
-    try {
-        // Check if sample already exists and is valid
-        if (fs.existsSync(samplePath)) {
-            const stats = fs.statSync(samplePath);
-            if (stats.size > 1000) { // File is not empty
-                console.log('Serving existing sample video');
-                return serveVideoFile(res, samplePath);
-            } else {
-                // Remove corrupted file
-                fs.unlinkSync(samplePath);
-            }
-        }
-        
-        console.log('Generating new sample video...');
-        
-        // Create a sample video with text overlay and effects
-        await new Promise((resolve, reject) => {
-            ffmpeg()
-                .input('color=c=#ff0040:size=1080x1920:duration=15:rate=30')
-                .inputFormat('lavfi')
-                .input('anullsrc=channel_layout=stereo:sample_rate=48000')
-                .inputFormat('lavfi')
-                .videoCodec('libx264')
-                .audioCodec('aac')
-                .complexFilter([
-                    // Create animated background
-                    '[0:v]scale=1080:1920,format=yuv420p[bg]',
-                    // Add text overlay with animation
-                    '[bg]drawtext=fontsize=80:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2-200:text=\'🔥 VIRAL CLIP 🔥\':enable=\'between(t,1,14)\'[text1]',
-                    '[text1]drawtext=fontsize=60:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:text=\'Sample Video\':enable=\'between(t,2,14)\'[text2]',
-                    '[text2]drawtext=fontsize=40:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2+200:text=\'Ready for Social Media\':enable=\'between(t,3,14)\'[final]'
-                ])
-                .outputOptions([
-                    '-map', '[final]',
-                    '-map', '1:a',
-                    '-preset', 'fast',
-                    '-crf', '23',
-                    '-movflags', '+faststart',
-                    '-t', '15',
-                    '-r', '30'
-                ])
-                .output(samplePath)
-                .on('start', (commandLine) => {
-                    console.log('FFmpeg command:', commandLine);
-                })
-                .on('progress', (progress) => {
-                    console.log('Sample video progress:', Math.round(progress.percent || 0) + '%');
-                })
-                .on('end', () => {
-                    console.log('Sample video generation completed');
-                    resolve();
-                })
-                .on('error', (error) => {
-                    console.error('Sample video generation error:', error);
-                    reject(error);
-                })
-                .run();
-        });
-        
-        // Verify the generated file
-        if (fs.existsSync(samplePath)) {
-            const stats = fs.statSync(samplePath);
-            if (stats.size > 1000) {
-                console.log(`Sample video generated successfully: ${stats.size} bytes`);
-                return serveVideoFile(res, samplePath);
-            }
-        }
-        
-        throw new Error('Generated sample video is invalid');
-        
-    } catch (error) {
-        console.error('Sample video error:', error);
-        res.status(500).json({ 
-            error: 'Failed to generate sample video',
-            details: error.message 
-        });
-    }
-});
-
-// Helper function to serve video files with proper headers
-function serveVideoFile(res, filePath) {
-    const stat = fs.statSync(filePath);
+    const stat = fs.statSync(videoPath);
     const fileSize = stat.size;
-    
-    res.writeHead(200, {
-        'Content-Length': fileSize,
-        'Content-Type': 'video/mp4',
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public, max-age=3600'
-    });
-    
-    const readStream = fs.createReadStream(filePath);
-    readStream.pipe(res);
-    
-    readStream.on('error', (error) => {
-        console.error('Error streaming video:', error);
-        if (!res.headersSent) {
-            res.status(500).json({ error: 'Failed to stream video' });
-        }
-    });
-}
+    const range = req.headers.range;
 
-// Enhanced video info route
-app.get('/api/info/:videoId', async (req, res) => {
-    try {
-        const { videoId } = req.params;
-        
-        if (!videoId || videoId.length !== 11) {
-            return res.status(400).json({ 
-                error: 'Invalid video ID format' 
-            });
+    res.setHeader('Content-Type', 'video/mp4');
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+        if (start >= fileSize || end >= fileSize) {
+            return res.status(416).json({ error: 'Range not satisfiable' });
         }
-        
-        const url = `https://www.youtube.com/watch?v=${videoId}`;
-        
-        if (!isValidYouTubeUrl(url)) {
-            return res.status(400).json({ 
-                error: 'Invalid YouTube video ID' 
-            });
-        }
-        
-        const info = await getVideoInfo(videoId);
-        res.json({
-            success: true,
-            ...info
+
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(videoPath, { start, end });
+
+        res.writeHead(206, {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Content-Length': chunksize,
         });
-        
-    } catch (error) {
-        console.error('Video info error:', error);
-        
-        let errorMessage = 'Failed to get video information';
-        let statusCode = 500;
-        
-        if (error.message.includes('unavailable') || error.message.includes('private')) {
-            statusCode = 404;
-            errorMessage = error.message;
-        } else if (error.message.includes('too long') || error.message.includes('too short')) {
-            statusCode = 400;
-            errorMessage = error.message;
-        }
-        
-        res.status(statusCode).json({ 
-            success: false,
-            error: errorMessage 
+
+        file.pipe(res);
+    } else {
+        res.writeHead(200, {
+            'Content-Length': fileSize,
         });
+
+        fs.createReadStream(videoPath).pipe(res);
     }
 });
 
-// Enhanced endpoint to validate YouTube URL
-app.post('/api/validate', async (req, res) => {
-    try {
-        const { url } = req.body;
-        
-        if (!url) {
-            return res.status(400).json({
-                success: false,
-                error: 'URL is required'
-            });
-        }
+// Sample video endpoint
+app.get('/api/videos/sample', (req, res) => {
+    const samplePath = path.join(processedDir, 'sample.mp4');
 
-        console.log('Validating URL:', url);
-        
-        const videoId = extractVideoId(url);
-        
-        if (!videoId) {
-            return res.json({
-                success: true,
-                isValid: false,
-                videoId: null,
-                error: 'Invalid YouTube URL format'
-            });
-        }
-
-        const isValid = isValidYouTubeUrl(url);
-        
-        // Additional validation - try to get basic video info
-        let canAccess = false;
-        let accessError = null;
-        
-        if (isValid && videoId) {
-            try {
-                // Quick check if video is accessible
-                const testUrl = `https://www.youtube.com/watch?v=${videoId}`;
-                await ytdl.getBasicInfo(testUrl, {
-                    requestOptions: {
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                        }
-                    }
-                });
-                canAccess = true;
-            } catch (testError) {
-                console.warn('Video access test failed:', testError.message);
-                if (testError.message.includes('Video unavailable')) {
-                    accessError = 'Video is unavailable, private, or deleted';
-                } else if (testError.message.includes('Sign in')) {
-                    accessError = 'Age-restricted video - cannot process';
-                } else {
-                    accessError = 'Video may not be accessible';
-                }
-            }
-        }
-        
-        res.json({
-            success: true,
-            isValid: isValid && canAccess,
-            videoId: isValid ? videoId : null,
-            canAccess,
-            warning: accessError
+    if (fs.existsSync(samplePath)) {
+        const stat = fs.statSync(samplePath);
+        res.writeHead(200, {
+            'Content-Length': stat.size,
+            'Content-Type': 'video/mp4'
         });
-        
-    } catch (error) {
-        console.error('Validation error:', error);
-        res.status(500).json({
-            success: false,
-            error: 'Validation failed: ' + error.message
-        });
+        fs.createReadStream(samplePath).pipe(res);
+    } else {
+        res.status(404).json({ error: 'Sample video not available' });
     }
 });
 
-// Homepage route
+// Homepage
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Health check route
+// Health check
 app.get('/health', (req, res) => {
     res.status(200).json({ 
         status: 'Server is running properly',
@@ -990,16 +649,14 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
-    console.error('Server error:', err);
+    console.error('❌ Server error:', err);
     res.status(500).json({ 
-        error: 'Internal server error',
-        message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+        error: 'Internal server error'
     });
 });
 
-// 404 handler
 app.use((req, res) => {
     res.status(404).json({ 
         error: 'Not found',
@@ -1009,7 +666,7 @@ app.use((req, res) => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-    console.log('SIGTERM received, shutting down gracefully');
+    console.log('🛑 SIGTERM received, shutting down gracefully');
     cleanupOldFiles();
     process.exit(0);
 });
@@ -1017,9 +674,8 @@ process.on('SIGTERM', () => {
 // Start server
 app.listen(port, '0.0.0.0', () => {
     console.log(`🚀 Viral Clip Generator Server running on port ${port}`);
-    console.log(`📱 Access the site at: http://0.0.0.0:${port}`);
-    console.log(`❤️ Health check: http://0.0.0.0:${port}/health`);
-    
-    // Initial cleanup
+    console.log(`🌐 Access: http://0.0.0.0:${port}`);
+    console.log(`❤️ Health: http://0.0.0.0:${port}/health`);
+
     cleanupOldFiles();
 });
