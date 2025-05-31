@@ -221,26 +221,35 @@ async function getVideoInfo(videoId) {
             }).catch(error => {
                 clearTimeout(timeout);
                 console.error('❌ ytdl.getInfo error:', error);
-                
+
                 let errorMessage = 'Failed to get video information';
 
-                if (error && error.message) {
-                    if (error.message.includes('Video unavailable')) {
+                // Handle both error objects and strings
+                const errorString = error ? (error.message || error.toString() || JSON.stringify(error)) : 'Unknown error';
+                console.error('❌ Error details:', errorString);
+
+                if (errorString) {
+                    if (errorString.includes('Video unavailable') || errorString.includes('unavailable')) {
                         errorMessage = 'Video is unavailable, private, or deleted';
-                    } else if (error.message.includes('Sign in')) {
+                    } else if (errorString.includes('Sign in') || errorString.includes('age')) {
                         errorMessage = 'Age-restricted video - cannot access';
-                    } else if (error.message.includes('This video is not available')) {
+                    } else if (errorString.includes('This video is not available') || errorString.includes('not available')) {
                         errorMessage = 'Video is not available in this region';
-                    } else if (error.message.includes('Private video')) {
+                    } else if (errorString.includes('Private video') || errorString.includes('private')) {
                         errorMessage = 'This is a private video';
-                    } else if (error.message.includes('429')) {
+                    } else if (errorString.includes('429') || errorString.includes('Too Many Requests')) {
                         errorMessage = 'Too many requests - please try again later';
+                    } else if (errorString.includes('403') || errorString.includes('Forbidden')) {
+                        errorMessage = 'Access forbidden - video may be restricted';
+                    } else if (errorString.includes('404') || errorString.includes('Not Found')) {
+                        errorMessage = 'Video not found or URL is invalid';
+                    } else if (errorString.includes('network') || errorString.includes('ENOTFOUND')) {
+                        errorMessage = 'Network error - please check your connection';
                     } else {
-                        errorMessage = `Failed to access video: ${error.message}`;
+                        errorMessage = `Failed to access video: ${errorString}`;
                     }
                 } else {
                     errorMessage = 'Unknown error occurred while getting video information';
-                    console.error('❌ Empty or undefined error object:', error);
                 }
 
                 reject(new Error(errorMessage));
@@ -463,7 +472,7 @@ app.post('/api/validate', async (req, res) => {
 
         try {
             const testUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            
+
             // First check URL validity
             let isValid = false;
             try {
@@ -534,7 +543,7 @@ app.get('/api/info/:videoId', async (req, res) => {
 
         console.log('📄 Getting info for video ID:', videoId);
         const info = await getVideoInfo(videoId);
-        
+
         res.json({
             success: true,
             ...info
@@ -613,7 +622,32 @@ app.post('/api/process', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Processing error:', error);
+        // Enhanced error handling with detailed logging
+        const errorString = error ? (error.message || error.toString() || JSON.stringify(error)) : 'Unknown error';
+        console.error('❌ Processing error details:', {
+            error: errorString,
+            stack: error?.stack,
+            name: error?.name,
+            code: error?.code
+        });
+
+        let errorMessage = errorString || 'Unknown error occurred';
+        let statusCode = 500;
+
+        if (errorString.includes('unavailable') || errorString.includes('private')) {
+            statusCode = 400;
+        } else if (errorString.includes('too long') || errorString.includes('too short')) {
+            statusCode = 400;
+        } else if (errorString.includes('timeout')) {
+            statusCode = 408;
+            errorMessage = 'Processing timeout. Please try a shorter video.';
+        } else if (errorString.includes('403') || errorString.includes('Forbidden')) {
+            statusCode = 403;
+            errorMessage = 'Access forbidden - video may be restricted';
+        } else if (errorString.includes('404') || errorString.includes('Not Found')) {
+            statusCode = 404;
+            errorMessage = 'Video not found or URL is invalid';
+        }
 
         if (downloadedPath && fs.existsSync(downloadedPath)) {
             try {
@@ -621,20 +655,6 @@ app.post('/api/process', async (req, res) => {
             } catch (cleanupError) {
                 console.error('Cleanup error:', cleanupError);
             }
-        }
-
-        let errorMessage = 'Failed to process video';
-        let statusCode = 500;
-
-        if (error.message.includes('unavailable') || error.message.includes('private')) {
-            statusCode = 400;
-            errorMessage = error.message;
-        } else if (error.message.includes('too long') || error.message.includes('too short')) {
-            statusCode = 400;
-            errorMessage = error.message;
-        } else if (error.message.includes('timeout')) {
-            statusCode = 408;
-            errorMessage = 'Processing timeout. Please try a shorter video.';
         }
 
         res.status(statusCode).json({ 

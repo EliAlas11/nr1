@@ -736,7 +736,7 @@
 
                 const response = await fetch(`${API_BASE_URL}/info/${videoId}`);
                 console.log('📄 Video info response status:', response.status);
-                
+
                 let info;
                 try {
                     info = await response.json();
@@ -765,9 +765,9 @@
                     throw new Error(errorMessage);
                 }
             } catch (error) {
-                console.error('Video info error:', error);
-                const errorMessage = error.message || 'Unknown error occurred';
-                
+            console.error('Video info error:', error);
+            const errorMessage = error ? (error.message || error.toString() || 'Unknown error occurred') : 'Network or server error';
+
                 videoInfoDiv.innerHTML = `
                     <h3><i class="fas fa-exclamation-triangle"></i> Video Information Error</h3>
                     <div style="color: #fd746c; padding: 15px; background: rgba(253, 116, 108, 0.1); border-radius: 8px;">
@@ -859,7 +859,7 @@
                 });
 
                 console.log('📥 Process response status:', response.status);
-                
+
                 let data;
                 try {
                     data = await response.json();
@@ -885,10 +885,10 @@
                 }, 1000);
 
             } catch (error) {
-                console.error('❌ Processing error:', error);
-                updateProgress(0);
-                
-                const errorMessage = error.message || 'Unknown error occurred during processing';
+            console.error('❌ Processing error:', error);
+            updateProgress(0);
+
+            const errorMessage = error ? (error.message || error.toString() || 'Unknown error occurred during processing') : 'Network or server error';
                 showError(errorMessage);
                 showNotification(errorMessage, 'error');
             } finally {
