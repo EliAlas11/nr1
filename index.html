@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -20,13 +19,13 @@
             --box-shadow: 0 10px 30px rgba(0,0,0,0.1);
             --transition: all 0.3s ease;
         }
-        
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body { 
             font-family: 'Inter', Arial, sans-serif;
             background: linear-gradient(135deg, #f6f9fc 0%, #eef2f7 100%);
@@ -38,7 +37,7 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         .container { 
             background: white;
             padding: 40px;
@@ -49,7 +48,7 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .container::before {
             content: '';
             position: absolute;
@@ -59,12 +58,12 @@
             height: 6px;
             background: var(--primary-color);
         }
-        
+
         .header {
             text-align: center;
             margin-bottom: 30px;
         }
-        
+
         .header h1 {
             font-size: 2.5rem;
             font-weight: 700;
@@ -74,24 +73,24 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         .header h1 i {
             color: var(--primary-color);
             margin-right: 10px;
         }
-        
+
         .header p {
             font-size: 1.1rem;
             color: #666;
             max-width: 80%;
             margin: 0 auto;
         }
-        
+
         .input-group {
             position: relative;
             margin-bottom: 25px;
         }
-        
+
         .input-group i {
             position: absolute;
             left: 15px;
@@ -101,7 +100,7 @@
             font-size: 1.2rem;
             transition: var(--transition);
         }
-        
+
         input { 
             width: 100%;
             padding: 16px 16px 16px 45px;
@@ -112,23 +111,23 @@
             font-family: 'Inter', Arial, sans-serif;
             direction: ltr;
         }
-        
+
         input:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(255, 0, 64, 0.1);
         }
-        
+
         input:focus + i {
             color: var(--primary-color);
         }
-        
+
         .btn-group {
             display: flex;
             gap: 10px;
             margin-bottom: 30px;
         }
-        
+
         button { 
             background: var(--primary-color);
             color: white;
@@ -145,30 +144,36 @@
             justify-content: center;
             font-family: 'Inter', Arial, sans-serif;
         }
-        
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         button i {
             margin-right: 8px;
         }
-        
-        button:hover {
+
+        button:hover:not(:disabled) {
             background: var(--primary-hover);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(255, 0, 64, 0.2);
         }
-        
-        button:active {
+
+        button:active:not(:disabled) {
             transform: translateY(0);
         }
-        
+
         .btn-secondary {
             background: var(--secondary-color);
         }
-        
-        .btn-secondary:hover {
+
+        .btn-secondary:hover:not(:disabled) {
             background: #1a2530;
             box-shadow: 0 5px 15px rgba(44, 62, 80, 0.2);
         }
-        
+
         .loader {
             border: 4px solid rgba(255, 0, 64, 0.1);
             border-top: 4px solid var(--primary-color);
@@ -179,12 +184,12 @@
             margin: 30px auto;
             display: none;
         }
-        
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
+
         .result { 
             margin-top: 20px;
             text-align: center;
@@ -193,7 +198,7 @@
             padding: 30px;
             display: none;
         }
-        
+
         .result h2 {
             font-size: 1.8rem;
             color: var(--secondary-color);
@@ -202,12 +207,12 @@
             align-items: center;
             justify-content: center;
         }
-        
+
         .result h2 i {
             color: var(--primary-color);
             margin-right: 10px;
         }
-        
+
         .video-container {
             position: relative;
             border-radius: var(--border-radius);
@@ -215,19 +220,19 @@
             margin: 20px 0;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        
+
         video { 
             width: 100%;
             display: block;
             border-radius: var(--border-radius);
         }
-        
+
         .actions {
             display: flex;
             gap: 10px;
             margin-top: 20px;
         }
-        
+
         .actions a {
             flex: 1;
             display: flex;
@@ -242,41 +247,61 @@
             transition: var(--transition);
             border: 2px solid #e1e5ea;
         }
-        
+
         .actions a i {
             margin-right: 8px;
         }
-        
+
         .actions a:hover {
             background: var(--light-bg);
             transform: translateY(-2px);
         }
-        
+
+        .error {
+            color: var(--primary-color);
+            font-weight: 600;
+            margin-top: 10px;
+            background: #fff5f5;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .success {
+            color: #22c55e;
+            font-weight: 600;
+            margin-top: 10px;
+            background: #f0fdf4;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border-left: 4px solid #22c55e;
+        }
+
         .platform-icons {
             display: flex;
             justify-content: center;
             gap: 15px;
             margin-top: 20px;
         }
-        
+
         .platform-icons i {
             font-size: 1.8rem;
             color: #666;
             transition: var(--transition);
         }
-        
+
         .platform-icons i:hover {
             color: var(--primary-color);
             transform: scale(1.1);
         }
-        
+
         .features {
             display: flex;
             flex-wrap: wrap;
             gap: 20px;
             margin-top: 40px;
         }
-        
+
         .feature {
             flex: 1;
             min-width: 200px;
@@ -287,162 +312,70 @@
             box-shadow: 0 5px 15px rgba(0,0,0,0.05);
             transition: var(--transition);
         }
-        
+
         .feature:hover {
             transform: translateY(-5px);
             box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
-        
+
         .feature i {
             font-size: 2rem;
             color: var(--primary-color);
             margin-bottom: 15px;
         }
-        
+
         .feature h3 {
             font-size: 1.2rem;
             margin-bottom: 10px;
             color: var(--secondary-color);
         }
-        
+
         .feature p {
             color: #666;
             font-size: 0.9rem;
         }
-        
+
         .footer {
             margin-top: 40px;
             text-align: center;
             color: #666;
             font-size: 0.9rem;
         }
-        
-        .error {
-            color: var(--primary-color);
-            font-weight: 600;
-            margin-top: 10px;
-        }
-        
-        /* Dark mode toggle */
-        .theme-toggle {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: none;
-            border: none;
-            color: var(--secondary-color);
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: var(--transition);
-            padding: 5px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .theme-toggle:hover {
-            background: var(--light-bg);
-            transform: none;
-            box-shadow: none;
-        }
-        
-        /* Dark mode styles */
-        body.dark-mode {
-            background: var(--dark-bg);
-            color: var(--light-text);
-        }
-        
-        body.dark-mode .container {
-            background: #2d3748;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        }
-        
-        body.dark-mode .header h1,
-        body.dark-mode .result h2 {
-            color: var(--light-text);
-        }
-        
-        body.dark-mode .header p {
-            color: #cbd5e0;
-        }
-        
-        body.dark-mode input {
-            background: #3a4a5e;
-            border-color: #4a5568;
-            color: var(--light-text);
-        }
-        
-        body.dark-mode .result {
-            background: #3a4a5e;
-        }
-        
-        body.dark-mode .actions a {
-            background: #4a5568;
-            color: var(--light-text);
-            border-color: #4a5568;
-        }
-        
-        body.dark-mode .actions a:hover {
-            background: #2d3748;
-        }
-        
-        body.dark-mode .feature {
-            background: #3a4a5e;
-        }
-        
-        body.dark-mode .feature h3 {
-            color: var(--light-text);
-        }
-        
-        body.dark-mode .feature p,
-        body.dark-mode .footer,
-        body.dark-mode .platform-icons i {
-            color: #cbd5e0;
-        }
-        
-        body.dark-mode .theme-toggle {
-            color: var(--light-text);
-        }
-        
-        body.dark-mode .theme-toggle:hover {
-            background: #4a5568;
-        }
-        
+
         /* Responsive styles */
         @media (max-width: 768px) {
             .container {
                 padding: 30px 20px;
             }
-            
+
             .header h1 {
                 font-size: 2rem;
             }
-            
+
             .header p {
                 font-size: 1rem;
                 max-width: 100%;
             }
-            
+
             .btn-group {
                 flex-direction: column;
             }
-            
+
             .features {
                 flex-direction: column;
             }
-            
+
             .feature {
                 min-width: 100%;
             }
         }
-        
+
         /* Animation */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
+
         .container, .result, .feature {
             animation: fadeIn 0.5s ease-out;
         }
@@ -458,12 +391,12 @@
             <h1><i class="fas fa-fire"></i> Viral Clip Generator</h1>
             <p>Transform YouTube videos into viral clips perfect for TikTok, Reels, and Shorts</p>
         </div>
-        
+
         <div class="input-group">
             <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." />
             <i class="fab fa-youtube"></i>
         </div>
-        
+
         <div class="btn-group">
             <button onclick="processVideo()" id="processBtn">
                 <i class="fas fa-magic"></i> Create Viral Clip
@@ -472,38 +405,13 @@
                 <i class="fas fa-lightbulb"></i> Show Examples
             </button>
         </div>
-        
+
         <div class="loader" id="loader"></div>
-        
+
         <div class="result" id="result">
-            <h2><i class="fas fa-check-circle"></i> Your Viral Clip is Ready!</h2>
-            
-            <div class="video-container">
-                <video controls autoplay id="resultVideo">
-                    <source src="" type="video/mp4">
-                    Your browser does not support video playback.
-                </video>
-            </div>
-            
-            <div class="actions">
-                <a href="#" download="viral-clip.mp4" id="downloadLink">
-                    <i class="fas fa-download"></i> Download Clip
-                </a>
-                <a href="#" id="shareLink">
-                    <i class="fas fa-share-alt"></i> Share
-                </a>
-            </div>
-            
-            <p>Share directly on:</p>
-            <div class="platform-icons">
-                <i class="fab fa-tiktok"></i>
-                <i class="fab fa-instagram"></i>
-                <i class="fab fa-youtube"></i>
-                <i class="fab fa-facebook"></i>
-                <i class="fab fa-twitter"></i>
-            </div>
+            <!-- Results will be inserted here -->
         </div>
-        
+
         <div class="features">
             <div class="feature">
                 <i class="fas fa-robot"></i>
@@ -521,7 +429,7 @@
                 <p>Works on all devices and browsers</p>
             </div>
         </div>
-        
+
         <div class="footer">
             <p>© 2025 Viral Clip Generator - All Rights Reserved</p>
         </div>
@@ -670,132 +578,253 @@
         
         // Video processing function
         async function processVideo() {
-            const url = document.getElementById('youtubeUrl').value;
+            const url = document.getElementById('youtubeUrl').value.trim();
+
             if (!url) {
-                alert('Please enter a YouTube video URL');
+                showError('Please enter a YouTube video URL');
                 return;
             }
-            
+
+            const videoId = getYouTubeId(url);
+            if (!videoId) {
+                showError('Invalid YouTube URL. Please enter a valid YouTube video link.');
+                return;
+            }
+
             const loader = document.getElementById('loader');
             const resultDiv = document.getElementById('result');
             const processBtn = document.getElementById('processBtn');
             const examplesBtn = document.getElementById('examplesBtn');
-            
-            // Disable buttons and show loader
-            processBtn.disabled = true;
-            examplesBtn.disabled = true;
+
+            // Show loading state
+            setLoadingState(true);
             loader.style.display = 'block';
             resultDiv.style.display = 'none';
-            
+
             try {
-                // Get YouTube video ID
-                const videoId = getYouTubeId(url);
-                if (!videoId) throw new Error('Invalid YouTube URL');
-                
+                console.log('Processing video ID:', videoId);
+
                 // Call API to process video
-                const response = await fetch(`/api/process`, {
+                const response = await fetch('/api/process', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ videoId: videoId })
                 });
-                
+
+                console.log('Response status:', response.status);
+
                 if (!response.ok) {
-                    throw new Error('Failed to process video');
+                    const errorText = await response.text();
+                    throw new Error(`Server error: ${response.status} - ${errorText}`);
                 }
-                
+
                 const data = await response.json();
-                
+                console.log('Response data:', data);
+
                 if (!data.success) {
                     throw new Error(data.error || 'Failed to process video');
                 }
-                
-                // Update video source and download link
-                const resultVideo = document.getElementById('resultVideo');
-                const videoSource = resultVideo.querySelector('source');
-                const downloadLink = document.getElementById('downloadLink');
-                
-                // Use full URL for video
-                const videoUrl = window.location.origin + data.url;
-                
-                videoSource.src = videoUrl;
-                resultVideo.load(); // Reload video after changing source
-                
-                // Update download link
-                downloadLink.href = videoUrl;
-                downloadLink.setAttribute('download', `viral-clip-${data.videoId}.mp4`);
-                
-                // Show result
-                resultDiv.style.display = 'block';
-                
-                // Scroll to result
-                resultDiv.scrollIntoView({ behavior: 'smooth' });
-                
+
+                // Show success result
+                showVideoResult(data);
+
             } catch (error) {
-                // Show error message
-                resultDiv.innerHTML = `<p class="error"><i class="fas fa-exclamation-circle"></i> Error: ${error.message}</p>`;
-                resultDiv.style.display = 'block';
+                console.error('Error processing video:', error);
+                showError(`Error: ${error.message}`);
             } finally {
-                // Re-enable buttons and hide loader
-                processBtn.disabled = false;
-                examplesBtn.disabled = false;
+                setLoadingState(false);
                 loader.style.display = 'none';
             }
         }
-        
-        // Show examples function
-        function showExamples() {
-            // In a real application, this would show examples of viral clips
-            // Here we directly load a sample video
-            const resultVideo = document.getElementById('resultVideo');
-            const videoSource = resultVideo.querySelector('source');
-            const downloadLink = document.getElementById('downloadLink');
-            
-            // Use full URL for video
-            const videoUrl = window.location.origin + '/api/videos/sample';
-            
-            videoSource.src = videoUrl;
-            resultVideo.load(); // Reload video after changing source
-            
-            // Update download link
-            downloadLink.href = videoUrl;
-            downloadLink.setAttribute('download', 'viral-clip-example.mp4');
-            
-            // Show result
-            document.getElementById('result').style.display = 'block';
-            document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+
+        // Show video result
+        function showVideoResult(data) {
+            const resultDiv = document.getElementById('result');
+
+            // Build video URL
+            const videoUrl = window.location.origin + data.url;
+            console.log('Video URL:', videoUrl);
+
+            resultDiv.innerHTML = `
+                <h2><i class="fas fa-check-circle"></i> Your Viral Clip is Ready!</h2>
+
+                <div class="video-container">
+                    <video controls preload="metadata" id="resultVideo">
+                        <source src="${videoUrl}" type="video/mp4">
+                        <p>Your browser does not support video playback. <a href="${videoUrl}" download>Download the video instead</a>.</p>
+                    </video>
+                </div>
+
+                <div class="actions">
+                    <a href="${videoUrl}" download="viral-clip-${data.videoId}.mp4" id="downloadLink">
+                        <i class="fas fa-download"></i> Download Clip
+                    </a>
+                    <a href="#" onclick="shareVideo('${videoUrl}')" id="shareLink">
+                        <i class="fas fa-share-alt"></i> Share
+                    </a>
+                </div>
+
+                <p style="margin-top: 15px;">Share directly on:</p>
+                <div class="platform-icons">
+                    <i class="fab fa-tiktok" title="TikTok"></i>
+                    <i class="fab fa-instagram" title="Instagram"></i>
+                    <i class="fab fa-youtube" title="YouTube"></i>
+                    <i class="fab fa-facebook" title="Facebook"></i>
+                    <i class="fab fa-twitter" title="Twitter"></i>
+                </div>
+
+                <div class="success">
+                    <i class="fas fa-info-circle"></i> Video processed successfully! You can now download or share your viral clip.
+                </div>
+            `;
+
+            resultDiv.style.display = 'block';
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+
+            // Handle video load errors
+            const video = document.getElementById('resultVideo');
+            video.addEventListener('error', function(e) {
+                console.error('Video load error:', e);
+                showError('Failed to load video. The video file might be corrupted or not available.');
+            });
+
+            video.addEventListener('loadeddata', function() {
+                console.log('Video loaded successfully');
+            });
         }
-        
+
+        // Show error message
+        function showError(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `
+                <div class="error">
+                    <i class="fas fa-exclamation-circle"></i> ${message}
+                </div>
+            `;
+            resultDiv.style.display = 'block';
+        }
+
+        // Set loading state
+        function setLoadingState(isLoading) {
+            const processBtn = document.getElementById('processBtn');
+            const examplesBtn = document.getElementById('examplesBtn');
+
+            processBtn.disabled = isLoading;
+            examplesBtn.disabled = isLoading;
+
+            if (isLoading) {
+                processBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            } else {
+                processBtn.innerHTML = '<i class="fas fa-magic"></i> Create Viral Clip';
+            }
+        }
+
+        // Show examples function
+        async function showExamples() {
+            setLoadingState(true);
+            document.getElementById('loader').style.display = 'block';
+
+            try {
+                const videoUrl = window.location.origin + '/api/videos/sample';
+
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = `
+                    <h2><i class="fas fa-lightbulb"></i> Example Viral Clip</h2>
+
+                    <div class="video-container">
+                        <video controls preload="metadata">
+                            <source src="${videoUrl}" type="video/mp4">
+                            <p>Your browser does not support video playback.</p>
+                        </video>
+                    </div>
+
+                    <div class="actions">
+                        <a href="${videoUrl}" download="example-viral-clip.mp4">
+                            <i class="fas fa-download"></i> Download Example
+                        </a>
+                        <a href="#" onclick="shareVideo('${videoUrl}')">
+                            <i class="fas fa-share-alt"></i> Share
+                        </a>
+                    </div>
+
+                    <div class="success">
+                        <i class="fas fa-info-circle"></i> This is an example of what your viral clip could look like!
+                    </div>
+                `;
+
+                resultDiv.style.display = 'block';
+                resultDiv.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                showError('Failed to load example video');
+            } finally {
+                setLoadingState(false);
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+
         // YouTube ID extraction
         function getYouTubeId(url) {
+            if (!url) return null;
+
             const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
             const match = url.match(regExp);
-            return (match && match[2].length === 11) ? match[2] : null;
+
+            if (match && match[2] && match[2].length === 11) {
+                return match[2];
+            }
+
+            return null;
         }
-        
+
         // Share functionality
-        document.getElementById('shareLink').addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Check if Web Share API is supported
+        function shareVideo(videoUrl) {
             if (navigator.share) {
                 navigator.share({
                     title: 'Viral Clip from Viral Clip Generator',
-                    text: 'Check out this viral clip I created using Viral Clip Generator!',
-                    url: window.location.href
-                })
-                .catch(error => console.log('Error sharing:', error));
+                    text: 'Check out this viral clip I created!',
+                    url: videoUrl
+                }).catch(error => {
+                    console.log('Error sharing:', error);
+                    fallbackShare(videoUrl);
+                });
             } else {
-                // Fallback for browsers that don't support Web Share API
-                alert('You can copy the page URL and share it manually');
+                fallbackShare(videoUrl);
+            }
+        }
+
+        function fallbackShare(videoUrl) {
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(videoUrl).then(() => {
+                    alert('Video URL copied to clipboard!');
+                }).catch(() => {
+                    alert(`Share this URL: ${videoUrl}`);
+                });
+            } else {
+                alert(`Share this URL: ${videoUrl}`);
+            }
+        }
+
+        // Enter key support
+        document.getElementById('youtubeUrl').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                processVideo();
             }
         });
-        
-        // Initialize
+
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Viral Clip Generator initialized');
             optimizeForDevice();
             setupThemeToggle();
+
+            // Test server connectivity
+            fetch('/health')
+                .then(response => response.json())
+                .then(data => console.log('Server status:', data))
+                .catch(error => console.error('Server connectivity test failed:', error));
         });
     </script>
 </body>
